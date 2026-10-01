@@ -1,0 +1,124 @@
+---
+title: Pipeline de Requisições HTTP
+summary: Ciclo de vida completo de uma requisição HTTP no NestJS, cobrindo Guards de autenticação e papéis, Pipes de validação Zod, Interceptors e Exception Filters.
+---
+
+# Pipeline de Requisições HTTP
+
+Toda requisição HTTP recebida pela aplicação atravessa uma sequência rigorosa e previsível de interceptadores, proteções e transformações antes e depois de atingir o controller de destino.
+
+
+---
+
+## 🔄 Ordem de Execução do Pipeline
+
+Quando um cliente dispara uma requisição para a API (ex: `POST /meu-servico/api/v1/tasks`), a execução segue as etapas descritas a seguir:
+
+```
+1. Global Prefix (/<nome-do-projeto>/api/v1)
+       │
+       ▼
+2. AuthGuard (Validação de Token JWT / JWKS)
+       │ (Se válido ou rota @Public())
+       ▼
+3. RolesGuard (Validação de Papéis / @Roles())
+       │ (Se autorizado)
+       ▼
+4. ZodValidationPipe (Validação do Payload com Schemas Zod)
+       │ (Se dados válidos)
+       ▼
+5. Controller Handler & Service (Execução de Regras de Negócio)
+       │
+       ├─────────────────────────────────┐
+       ▼ (Sucesso)                       ▼ (Exceção)
+6. TransformInterceptor          7. HttpExceptionFilter
+       │                                 │
+       ▼                                 ▼
+Resposta JSON 200/201             Resposta JSON de Erro 4xx/5xx
+```
+
+---
+
+## 1. Segurança & Autenticação: `AuthGuard`
+
+- **Registro**: Registrado como guard global (`APP_GUARD`) no `AuthModule`.
+- **Comportamento**:
+  - Verifica se a rota ou classe possui o decorator `@Public()`. Em caso positivo, permite o acesso imediato.
+  - Caso contrário, extrai o header `Authorization: Bearer <token>`.
+  - Se o token estiver ausente ou inválido, lança `UnauthorizedException` (HTTP 401).
+  - Consulta o endpoint de certificados do Keycloak (JWKS) via biblioteca `jose` (com cache em memória).
+  - Valida a audiência (`aud`/`azp`) contra `KEYCLOAK_CLIENT_ID` (`cincoders-back`).
+  - Mapeia as roles de realm do Keycloak para `AccessRole` e injeta o objeto `{ userId, role }` em `request.user`.
+
+```typescript
+// src/common/auth/guards/auth.guard.ts
+const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+  context.getHandler(),
+  context.getClass(),
+]);
+
+if (isPublic) return true;
+
+const request = context.switchToHttp().getRequest<Request>();
+const user = await this.identitySource.extract(request);
+
+if (!user) {
+  throw new UnauthorizedException('Identidade não fornecida ou inválida.');
+}
+
+request.user = user;
+return true;
+```
+
+---
+
+## 2. Autorização por Papéis: `RolesGuard`
+
+- **Registro**: Registrado como segundo guard global (`APP_GUARD`) no `AuthModule`.
+- **Comportamento**:
+  - Lê os papéis requeridos através do decorator `@Roles(...)` no controller ou método.
+  - Se a rota não declarar `@Roles()`, permite a execução.
+  - Se declarar (ex: `@Roles(AccessRole.ADMIN)`), verifica se o `request.user.role` possui o nível necessário.
+  - Se o usuário não possuir permissão, lança `AccessDeniedException` (HTTP 403).
+
+---
+
+## 3. Validação de Dados: `ZodValidationPipe`
+
+- **Registro**: Registrado globalmente como `APP_PIPE` no `AppModule`.
+- **Comportamento**:
+  - Intercepta os parâmetros marcados com `@Body()`, `@Query()` e `@Param()`.
+  - Executa a validação do schema Zod associado ao DTO criado com `createZodDto()`.
+  - Se a validação falhar, lança `ZodValidationException` (HTTP 422), repassando a lista detalhada de campos inválidos para o filtro de exceções.
+
+---
+
+## 4. Transformação de Resposta: `TransformInterceptor`
+
+- **Registro**: Registrado globalmente via `app.useGlobalInterceptors()` em `main.ts`.
+- **Comportamento**:
+  - Envelopa automaticamente o retorno de qualquer rota bem-sucedida no formato padrão da API:
+
+```json
+{
+  "statusCode": 200,
+  "timestamp": "2026-08-26T20:00:00.000Z",
+  "path": "/meu-servico/api/v1/tasks",
+  "data": {
+    "items": [...],
+    "total": 10,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  }
+}
+```
+
+---
+
+## 5. Tratamento Global de Erros: `HttpExceptionFilter`
+
+- **Registro**: Registrado globalmente via `app.useGlobalFilters()` em `main.ts`.
+- **Comportamento**:
+  - Intercepta qualquer exceção não tratada disparada durante a requisição.
+  - Converte exceções de domínio (`AppException`), erros de validação Zod e `HttpException` padrão em uma resposta de erro consistente contendo `statusCode`, `timestamp`, `path`, `code` (`ErrorCode`) e `message`.

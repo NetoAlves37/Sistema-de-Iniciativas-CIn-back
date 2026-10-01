@@ -1,0 +1,115 @@
+---
+title: Configuração do Keycloak Local
+summary: Detalhes sobre o arquivo setup/realm.json, importação automática no Docker Compose, usuários de teste e clientes configurados.
+---
+
+# Configuração do Keycloak Local
+
+O boilerplate inclui suporte completo para desenvolvimento local com autenticação OpenID Connect / JWT através do [Keycloak](https://www.keycloak.org/).
+
+## 📦 Importação Automática do Realm
+
+O serviço `keycloak` no arquivo `docker-compose.yml` utiliza o parâmetro `--import-realm`, montando o arquivo `setup/realm.json` em `/opt/keycloak/data/import/realm.json`:
+
+```yaml
+keycloak:
+  image: quay.io/keycloak/keycloak:26.1
+  command: start-dev --import-realm
+  volumes:
+    - ./setup/realm.json:/opt/keycloak/data/import/realm.json:ro
+  environment:
+    KEYCLOAK_ADMIN: admin
+    KEYCLOAK_ADMIN_PASSWORD: admin
+    KC_HTTP_RELATIVE_PATH: /auth
+  ports:
+    - '8080:8080'
+```
+
+> **Atenção**: O arquivo `setup/realm.json` destina-se **exclusivamente ao ambiente de desenvolvimento local**. Para ambientes de homologação ou produção, utilize instâncias corporativas do Keycloak com secrets e configurações seguras.
+
+---
+
+## 👥 O que vem configurado no Realm
+
+O script de criação do projeto substitui automaticamente o placeholder `cincoders` dentro do `setup/realm.json` (clients, roles, ids), mas o **nome do realm em si é sempre `Local`**, independente do nome do projeto — isso evita ter que reconfigurar o Keycloak a cada novo projeto gerado.
+
+### 1. Realm
+- **Nome**: `Local`
+- **URL Base Local**: `http://localhost:8080/auth/realms/Local`
+
+### 2. Papéis (Roles)
+
+O realm define papéis próprios do projeto, com o prefixo `sys_<nome-do-projeto>-`:
+
+- `sys_cincoders-admin`: Administrador com acesso completo a recursos privilegiados.
+- `sys_cincoders-users`: Usuário padrão com acesso restrito a operações comuns.
+
+Esses papéis de realm são mapeados internamente para o enum `AccessRole` (`src/common/auth/access-role.enum.ts`) em `REALM_ROLE_TO_ACCESS_ROLE` (`src/common/auth/identity/keycloak.identity-source.ts`):
+
+```ts
+enum AccessRole {
+  ADMIN = 'ADMIN',
+  USER = 'USER',
+}
+
+const REALM_ROLE_TO_ACCESS_ROLE: Record<string, AccessRole> = {
+  'sys_cincoders-admin': AccessRole.ADMIN,
+  'sys_cincoders-users': AccessRole.USER,
+};
+```
+
+### 3. Usuários de Teste Pré-cadastrados
+
+| Usuário | Senha | Papéis de Realm | AccessRole Resultante | Propósito |
+|---|---|---|---|---|
+| `admin` | `admin` | `sys_cincoders-admin`, `sys_cincoders-users` | `ADMIN` | Testar endpoints protegidos com `@Roles(AccessRole.ADMIN)` |
+| `user` | `user` | `sys_cincoders-users` | `USER` | Testar endpoints com `@Roles(AccessRole.USER)` ou padrão |
+
+### 4. Clientes (Clients) Configurados
+
+| Client ID | Tipo | Uso |
+|---|---|---|
+| `cincoders-back` | Confidential (Service Account) | API Backend (recebe e valida tokens, secret: `dev-secret`) |
+| `cincoders-front` | Public | SPAs, frontends e clientes Web sem client secret |
+
+---
+
+## 🔑 Variáveis de Ambiente no `.env`
+
+O `.env.example` já é configurado para apontar para a instância local do Keycloak:
+
+```ini
+# Configuração do Keycloak
+KEYCLOAK_AUTH_SERVER_URL=http://localhost:8080/auth
+KEYCLOAK_REALM=Local
+KEYCLOAK_CLIENT_ID=cincoders-back
+KEYCLOAK_JWKS_CACHE_MAX_AGE=600000
+KEYCLOAK_JWKS_TIMEOUT=5000
+```
+
+- `KEYCLOAK_AUTH_SERVER_URL`: URL base do servidor Keycloak.
+- `KEYCLOAK_REALM`: Nome do realm da aplicação.
+- `KEYCLOAK_CLIENT_ID`: Identificador do client para validação das claims `azp` e `aud` no JWT.
+- `KEYCLOAK_JWKS_CACHE_MAX_AGE`: Tempo em milissegundos para cache das chaves públicas JWKS (padrão: 10 minutos).
+- `KEYCLOAK_JWKS_TIMEOUT`: Timeout em milissegundos para requisições ao endpoint de JWKS (padrão: 5 segundos).
+
+---
+
+## 🧪 Obtendo um Token JWT via cURL
+
+Para testar requisições autenticadas localmente, você pode obter um token JWT usando a concessão `password`:
+
+```bash
+# Obter token como ADMIN
+curl -X POST "http://localhost:8080/auth/realms/Local/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "client_id=cincoders-back" \
+  -d "client_secret=dev-secret" \
+  -d "username=admin" \
+  -d "password=admin"
+
+# Usar o token na API (troque "cincoders" pelo nome técnico do seu projeto, ver API_PREFIX no .env)
+curl -X GET "http://localhost:3000/cincoders/api/v1/tasks" \
+  -H "Authorization: Bearer <access_token>"
+```

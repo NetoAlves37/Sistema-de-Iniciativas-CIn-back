@@ -1,0 +1,135 @@
+---
+title: Visão Geral da Arquitetura
+summary: Estrutura modular, inicialização da aplicação em main.ts, carregamento de configuração e integração dos componentes do boilerplate.
+---
+
+# Visão Geral da Arquitetura
+
+O boilerplate foi concebido como um **Monólito Modular** baseado em [NestJS 11](https://nestjs.com/), priorizando simplicidade, limites de domínio claros, segurança por padrão (*fail-closed*) e mínima fricção de desenvolvimento.
+
+---
+
+## 🏛️ Princípios Arquiteturais
+
+1. **Segurança Fail-Closed**: Todo endpoint novo é protegido automaticamente por autenticação JWT via Keycloak, a menos que seja explicitamente marcado com o decorator `@Public()`.
+2. **Fonte Única de Verdade com Zod**: DTOs são declarados usando schemas Zod (`createZodDto` do `nestjs-zod`), garantindo simultaneamente validação de dados em runtime, tipagem estática no TypeScript e geração de especificação OpenAPI (Swagger).
+3. **Isolamento de Domínio**: Cada módulo funcional (`src/modules/*`) encapsula seus próprios controllers, services e DTOs, consumindo o Prisma Client (`PrismaService`) para persistência.
+4. **Respostas e Erros Padronizados**: Interceptors e Exception Filters globais garantem que qualquer resposta da API siga um envelope JSON consistente.
+5. **Configuração Validada no Boot**: Falhas em variáveis de ambiente obrigatórias interrompem a inicialização imediatamente (*fail fast*), prevenindo falhas silenciosas em tempo de execução.
+
+---
+
+## 🚀 Bootstrap da Aplicação (`src/main.ts`)
+
+A inicialização da aplicação NestJS ocorre no arquivo `src/main.ts`:
+
+```typescript
+// src/main.ts
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+
+  // 1. Prefixo global da API
+  app.setGlobalPrefix('cincoders/api');
+  app.enableCors();
+
+  // 2. Filtro de exceção e interceptor de resposta globais
+  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalInterceptors(new TransformInterceptor());
+
+  // 3. Documentação Swagger com suporte a Bearer e OAuth2
+  const swaggerBuilder = new DocumentBuilder()
+    .setTitle(configService.get('swagger.title', 'cincoders API'))
+    .setDescription(configService.get('swagger.description', 'API documentation'))
+    .setVersion(configService.get('swagger.version', '1.0.0'))
+    .addBearerAuth();
+
+  const authServerUrl = configService.get<string>('keycloak.authServerUrl');
+  const realm = configService.get<string>('keycloak.realm');
+  if (authServerUrl && realm) {
+    const issuer = `${authServerUrl.replace(/\/$/, '')}/realms/${realm}`;
+    swaggerBuilder.addOAuth2({
+      type: 'oauth2',
+      flows: {
+        password: {
+          tokenUrl: `${issuer}/protocol/openid-connect/token`,
+          authorizationUrl: `${issuer}/protocol/openid-connect/auth`,
+          scopes: {},
+        },
+      },
+    });
+  }
+
+  const document = cleanupOpenApiDoc(SwaggerModule.createDocument(app, swaggerBuilder.build()));
+  SwaggerModule.setup(configService.get('swagger.path', 'api/docs'), app, document);
+
+  const port = configService.get<number>('PORT', 3000);
+  await app.listen(port);
+}
+```
+
+---
+
+## ⚙️ Módulo Raiz e Configurações (`src/app.module.ts`)
+
+O `AppModule` orquestra os módulos de infraestrutura e módulos de negócio:
+
+```typescript
+// src/app.module.ts
+@Module({
+  imports: [
+    // 1. Carregamento de configuração e validação de ambiente
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: validateEnv,
+      load: [databaseConfig, swaggerConfig, keycloakConfig],
+    }),
+
+    // 2. Conexão com PostgreSQL via Prisma (PrismaModule é @Global())
+    PrismaModule,
+
+    // 3. Módulos transversais e de domínio
+    AuthModule,
+    HealthModule,
+    TaskModule,
+  ],
+  providers: [
+    // Validação global com Zod
+    { provide: APP_PIPE, useClass: ZodValidationPipe },
+  ],
+})
+export class AppModule {}
+```
+
+---
+
+## 📁 Estrutura de Diretórios do Projeto
+
+```
+src/
+├── common/               # Recursos transversais compartilhados
+│   ├── auth/             # Módulo de autenticação (Guards, Keycloak JWKS, Decorators)
+│   ├── decorators/       # Decorators globais (@Public)
+│   ├── exceptions/       # Hierarquia de exceções de domínio e enum ErrorCode
+│   ├── filters/          # HttpExceptionFilter global
+│   ├── interceptors/     # TransformInterceptor (envelope de resposta)
+│   └── pagination/       # DTOs padronizados de consulta e resposta paginada
+├── config/               # Namespaces de configuração e validação de ambiente
+│   ├── database.config.ts
+│   ├── env.validation.ts
+│   ├── keycloak.config.ts
+│   └── swagger.config.ts
+├── database/             # Integração com Prisma
+│   ├── prisma.service.ts # PrismaService (extends PrismaClient, connect/disconnect)
+│   └── prisma.module.ts  # PrismaModule (@Global())
+├── modules/              # Módulos funcionais da aplicação
+│   ├── health/           # Health check via @nestjs/terminus + PrismaHealthIndicator
+│   └── task/             # Módulo de exemplo com CRUD completo
+├── app.module.ts         # Módulo raiz
+└── main.ts               # Ponto de entrada e bootstrap
+
+prisma/
+├── schema.prisma          # Fonte da verdade do schema (models, relações)
+├── migrations/            # Migrations SQL geradas pelo Prisma CLI
+└── seed.mjs                # Popula tabelas de lookup (status, prioridade, papéis)
+```

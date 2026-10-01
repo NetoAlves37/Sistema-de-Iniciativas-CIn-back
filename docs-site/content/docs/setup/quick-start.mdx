@@ -1,0 +1,111 @@
+---
+title: Setup Rápido
+summary: Como gerar novos projetos a partir do boilerplate e inicializar o ambiente de desenvolvimento.
+---
+
+# Setup Rápido
+
+O boilerplate foi desenvolvido para permitir a instanciação ágil de novos microsserviços sem alterar o repositório original.
+
+## ✅ Requisitos
+
+Antes de rodar o gerador, tenha instalado:
+
+- **[Node.js 22 LTS](https://nodejs.org/)** — mesma versão usada pelo boilerplate (`.nvmrc`/`.node-version`). Use `nvm install 22 && nvm use 22` se tiver o nvm.
+- **[Docker + Docker Compose](https://docs.docker.com/get-docker/)** — para subir PostgreSQL e Keycloak no ambiente de desenvolvimento do projeto gerado.
+- `bash`, `git`, `curl`, `perl`, `tar` e coreutils (`sed`, `awk`, `find`) no `PATH` — já presentes em qualquer Linux/macOS.
+
+### 🪟 Windows
+
+O `setup.sh` depende de utilitários POSIX e **não roda** no CMD ou PowerShell nativos. Instale o **[Git Bash](https://gitforwindows.org/)** e rode todos os comandos desta página a partir dele (o Git for Windows já traz `bash`, `curl`, `perl`, `tar` e os coreutils necessários).
+
+## 🧩 Gerando Frontend + Backend de Uma Vez
+
+Se o objetivo é começar um projeto CIn novo do zero, com frontend e backend juntos, use o repositório [`platform/boilerplate`](https://gitlab.cin.ufpe.br/cincoders/platform/boilerplate) em vez de gerar cada um separadamente.
+
+Ele clona o [`cincoders-nestjs-boilerplate`](https://gitlab.cin.ufpe.br/cincoders/platform/cincoders-nestjs-boilerplate) e o [`cincoders-reactjs-boilerplate`](https://gitlab.cin.ufpe.br/cincoders/platform/cincoders-reactjs-boilerplate) numa única execução, pergunta os dados compartilhados (nome, descrição, remote) uma única vez e cria `<nome>-back` e `<nome>-front` lado a lado, já com nome técnico e URLs alinhados entre os dois projetos. O realm do Keycloak (`Local`) já é o mesmo nos dois, independente do nome técnico.
+
+Numa pasta vazia (ou onde quiser as duas pastas do projeto):
+
+```bash
+curl -fsSL https://gitlab.cin.ufpe.br/cincoders/platform/boilerplate/-/raw/main/setup.sh | bash
+```
+
+Use essa opção quando precisar do par frontend + backend. Para gerar **apenas o backend** (por exemplo, para adicionar a um frontend já existente), siga a seção abaixo.
+
+## 🚀 Gerando um Novo Projeto (Somente Backend)
+
+Rode a partir da pasta onde quer criar o projeto:
+
+```bash
+curl -fsSL https://gitlab.cin.ufpe.br/cincoders/platform/cincoders-nestjs-boilerplate/-/raw/main/setup.sh | bash
+```
+
+O gerador detecta que não há repositório no diretório atual, clona o boilerplate num diretório temporário, executa a instanciação de lá e apaga o clone ao terminar. O projeto é criado no diretório de onde você chamou o comando.
+
+### Perguntas do Assistente Interativo
+
+Durante a execução, as seguintes configurações serão solicitadas:
+
+| Parâmetro | Formato Esperado | Exemplo | Aplicação no Projeto |
+|---|---|---|---|
+| **Nome do projeto** | `kebab-case` | `meu-servico` | `package.json`, clients Keycloak, roles, tags |
+| **Diretório de destino** | Caminho relativo/absoluto | `../meu-servico-back` | Local onde o novo repositório isolado será criado (por padrão, o nome técnico com sufixo `-back`) |
+| **Descrição** | Texto livre | `API do Meu Serviço` | `package.json`, descrição padrão do Swagger |
+| **Nome do banco de dados** | `snake_case` | `meu_servico` | Variável `DB_DATABASE` no `.env` (compõe `DATABASE_URL` para o Prisma) |
+| **Título do Swagger** | Texto livre | `Meu Servico API` | Título da documentação OpenAPI em `/api/docs` |
+| **Descrição do Swagger** | Texto livre | `Documentação da API` | Descrição no cabeçalho do Swagger |
+| **Git Remote URL** | URL SSH ou HTTPS | *(Opcional)* | Configuração inicial de `git remote add origin` |
+
+---
+
+## 🛠️ Executando o Projeto
+
+Após o setup, acesse o diretório criado e inicialize os serviços de infraestrutura com Docker Compose:
+
+```bash
+# 1. Navegar até o projeto criado
+cd ../meu-servico-back
+
+# 2. Subir os serviços de infraestrutura localmente
+docker compose up -d
+
+# 3. Aplicar as migrations iniciais no banco de dados
+npm run migration:run
+
+# 4. Popular as tabelas de lookup (status, prioridade, papéis)
+node prisma/seed.mjs
+
+# 5. Iniciar o servidor em modo de desenvolvimento (watch mode)
+npm run dev
+```
+
+### Endpoints Principais
+
+- **API Base**: `http://localhost:3000/<nome-do-projeto>/api/v1` (o prefixo `<nome-do-projeto>` vem de `API_PREFIX` no `.env`, gerado a partir do nome técnico do projeto)
+- **Health Check**: `http://localhost:3000/<nome-do-projeto>/api/health` (Público, não exige autenticação)
+- **Swagger / OpenAPI**: `http://localhost:3000/api/docs`
+- **Console do Keycloak**: `http://localhost:8080/auth` (Usuário: `admin`, Senha: `admin`)
+
+---
+
+## 📋 Comandos Disponíveis no `package.json`
+
+| Comando | Descrição |
+|---|---|
+| `npm run dev` | Inicia o servidor NestJS em modo de desenvolvimento com hot-reload |
+| `npm run build` | Compila o código TypeScript para a pasta `dist/` |
+| `npm run start:prod` | Inicia a aplicação a partir do build de produção (`node dist/main`) |
+| `npm run lint` | Executa o linter Biome e aplica correções automáticas no código |
+| `npm run lint:ci` | Executa a verificação do Biome em modo CI (somente leitura) |
+| `npm run format` | Formata o código com Biome |
+| `npm test` | Executa os testes unitários com Vitest |
+| `npm run test:watch` | Executa os testes unitários em modo watch |
+| `npm run test:cov` | Executa os testes e gera relatório de cobertura de código |
+| `npm run test:e2e` | Executa os testes end-to-end com Vitest |
+| `npm run prisma:generate` | Regenera o Prisma Client a partir de `prisma/schema.prisma` |
+| `npm run migration:generate` | Gera e aplica uma nova migration comparando `schema.prisma` com o banco (`prisma migrate dev`) |
+| `npm run migration:run` | Aplica migrations pendentes já commitadas, sem gerar novas (`prisma migrate deploy`) |
+| `npm run docs` | Inicia o servidor local de documentação (Next.js/Fumadocs) na porta 3030 |
+| `npm run docs:install` | Instala as dependências do site de documentação (`docs-site/`) |
+| `npm run docs:build` | Compila os arquivos estáticos do site de documentação |

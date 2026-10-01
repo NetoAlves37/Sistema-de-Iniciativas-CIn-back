@@ -1,0 +1,133 @@
+---
+title: Convenções de API & Documentação
+summary: Padrões de rotas, prefixo global /<nome-do-projeto>/api/v1, envelope de resposta, suporte a paginação e integração OpenAPI/Swagger.
+---
+
+# Convenções de API & Documentação
+
+Esta página documenta os padrões e contratos adotados na camada de transporte HTTP e na documentação OpenAPI.
+
+---
+
+## 🌐 Roteamento & Prefixos
+
+- **Prefixo Global**: Todas as rotas de negócio estão sob `/<nome-do-projeto>/api/v1` — o segmento `<nome-do-projeto>/api` é configurado em `src/main.ts` via `app.setGlobalPrefix(configService.get('API_PREFIX'))`, e o `v1` vem do versionamento URI (`app.enableVersioning`). O valor de `API_PREFIX` fica em `.env` (`API_PREFIX=sistema-de-iniciativas-cin/api` no projeto gerado, ex: `meu-servico/api`).
+- **Nomenclatura de Recursos**: Substantivos no plural em `kebab-case` (ex: `/meu-servico/api/v1/tasks`, `/meu-servico/api/v1/user-profiles`).
+- **IDs em Parâmetros**: Chaves primárias UUID validadas com `ParseUUIDPipe`:
+  ```typescript
+  @Get(':id')
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.findOne(id);
+  }
+  ```
+
+---
+
+## 📦 Envelope Padrão de Resposta (`TransformInterceptor`)
+
+Todas as respostas de sucesso retornadas pela API são envolvidas pelo `TransformInterceptor`:
+
+```typescript
+// src/common/interceptors/transform.interceptor.ts
+export interface ApiResponse<T> {
+  statusCode: number;
+  timestamp: string;
+  path: string;
+  data: T;
+}
+```
+
+### Exemplo de Resposta:
+
+```json
+{
+  "statusCode": 200,
+  "timestamp": "2026-08-26T20:20:00.000Z",
+  "path": "/meu-servico/api/v1/tasks/1234",
+  "data": {
+    "id": "1234",
+    "title": "Configurar ambiente",
+    "status": "pending",
+    "createdAt": "2026-08-26T20:00:00.000Z",
+    "updatedAt": "2026-08-26T20:00:00.000Z"
+  }
+}
+```
+
+---
+
+## 📄 Padrão de Paginação
+
+O boilerplate fornece classes auxiliares para listagens paginadas em `src/common/pagination/`:
+
+### 1. DTO de Consulta: `PaginationQueryDto`
+
+Controla a leitura dos query params `page` e `limit` com valores padrão (`page=1`, `limit=10`):
+
+```typescript
+// src/common/pagination/pagination-query.dto.ts
+export class PaginationQueryDto {
+  page?: number = 1;
+  limit?: number = 10;
+
+  get skip(): number {
+    return ((this.page ?? 1) - 1) * (this.limit ?? 10);
+  }
+
+  get take(): number {
+    return this.limit ?? 10;
+  }
+}
+```
+
+### 2. DTO de Resposta: `PaginatedResponseDto<T>`
+
+Padroniza a resposta paginada e calcula o total de páginas:
+
+```typescript
+// src/common/pagination/paginated-response.dto.ts
+export class PaginatedResponseDto<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+
+  static of<T>(items: T[], total: number, query: PaginationQueryDto): PaginatedResponseDto<T> {
+    const limit = query.take;
+    const page = query.page ?? 1;
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+}
+```
+
+---
+
+## 📖 Documentação OpenAPI (Swagger)
+
+A documentação interativa fica disponível em `/api/docs`.
+
+### Decorators Recomendados nos Controllers
+
+```typescript
+@ApiTags('Tasks')
+@ApiBearerAuth()
+@Controller('tasks')
+export class TaskController {
+  @Post()
+  @ApiOperation({ summary: 'Criar uma nova tarefa' })
+  @ApiResponse({ status: 201, description: 'Tarefa criada com sucesso' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  create(@Body() dto: CreateTaskDto) {
+    return this.taskService.create(dto);
+  }
+}
+```
+
+A integração com o `nestjs-zod` garante que as descrições declaradas nos schemas Zod com `.describe(...)` apareçam automaticamente na documentação do Swagger.

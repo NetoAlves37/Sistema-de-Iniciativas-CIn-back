@@ -1,0 +1,73 @@
+---
+title: Módulo Health (Terminus)
+summary: Endpoint público de health check e sonda de integridade com o banco de dados PostgreSQL usando @nestjs/terminus.
+---
+
+# Módulo Health (Terminus Probes)
+
+O `HealthModule` (`src/modules/health/`) implementa a verificação de saúde da aplicação e suas dependências externas através do pacote oficial `@nestjs/terminus`.
+
+---
+
+## 🏥 Como Funciona
+
+- **Endpoint**: `GET /api/health`
+- **Acesso Público**: Anotado com o decorator `@Public()`, dispensando o envio de tokens JWT.
+- **Sonda de Banco**: Executa um `pingCheck` contra a conexão do PostgreSQL gerenciada pelo Prisma, via `PrismaHealthIndicator`.
+
+```typescript
+// src/modules/health/health.controller.ts
+import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from '@nestjs/terminus';
+import { Public } from '@/common/decorators/public.decorator';
+import { PrismaService } from '@/database/prisma.service';
+
+@ApiTags('Health')
+@Controller('health')
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly db: PrismaHealthIndicator,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  @Get()
+  @Public()
+  @HealthCheck()
+  @ApiOperation({ summary: 'Verifica o status da aplicação e conexão com banco' })
+  @ApiResponse({ status: 200, description: 'Aplicação saudável' })
+  @ApiResponse({ status: 503, description: 'Serviço indisponível' })
+  check() {
+    return this.health.check([() => this.db.pingCheck('database', this.prisma)]);
+  }
+}
+```
+
+> `PrismaHealthIndicator.pingCheck` aceita qualquer client Prisma-like como segundo argumento — por isso `PrismaService` (que estende `PrismaClient`) é injetado diretamente no controller.
+
+---
+
+## 📤 Exemplo de Resposta (Status 200 OK)
+
+```json
+{
+  "statusCode": 200,
+  "timestamp": "2026-08-26T20:25:00.000Z",
+  "path": "/api/health",
+  "data": {
+    "status": "ok",
+    "info": {
+      "database": {
+        "status": "up"
+      }
+    },
+    "error": {},
+    "details": {
+      "database": {
+        "status": "up"
+      }
+    }
+  }
+}
+```

@@ -1,0 +1,74 @@
+---
+title: Leitura Obrigatória
+summary: Documentações e artigos que você precisa ler antes de mexer no código, se essa é sua primeira API web.
+---
+
+# Leitura Obrigatória
+
+Este boilerplate assume que você já sabe o que é um **framework web**, um **ORM** e uma **API REST**. Se você está no início da graduação e nunca trabalhou com nada disso, comece por aqui — sem essa base, o resto da documentação vai parecer uma lista de nomes soltos.
+
+Não precisa ler tudo de uma vez. Leia a seção de conceitos abaixo antes de rodar o projeto, e volte para a documentação do NestJS conforme for mexendo em cada camada (controller, service, etc).
+
+## 🧠 Conceitos que você precisa entender primeiro
+
+Antes de abrir o código, entenda estas quatro ideias. Elas aparecem em praticamente todo projeto backend, não só neste.
+
+| Conceito | Por que importa aqui | Leitura recomendada |
+|---|---|---|
+| **API REST** | O projeto expõe endpoints HTTP (`GET`, `POST`, `PUT`, `DELETE`) que o frontend consome | [O que é uma API REST (MDN)](https://developer.mozilla.org/pt-BR/docs/Glossary/REST) |
+| **ORM (Object-Relational Mapping)** | Em vez de escrever SQL na mão, usamos código TypeScript para representar tabelas e registros | [O que é um ORM (artigo Prisma)](https://www.prisma.io/dataguide/types/relational/what-is-an-orm) |
+| **Migrations de banco de dados** | Toda alteração no schema do banco é versionada em arquivos, como um "git para a estrutura das tabelas" | [O que são migrations (guia Prisma)](https://www.prisma.io/dataguide/types/relational/what-are-database-migrations) |
+| **Injeção de Dependências (DI)** | O NestJS gerencia a criação de classes automaticamente; você nunca dá `new Service()` na mão | [Introdução à Injeção de Dependências (docs NestJS)](https://docs.nestjs.com/providers#dependency-injection) |
+
+Se algum desses termos ainda parecer abstrato depois de ler, não tem problema — vai ficar mais claro quando você vir o código de verdade. O importante é reconhecer o nome quando ele aparecer.
+
+## 📘 Documentação Oficial do NestJS
+
+O [NestJS](https://nestjs.com/) é o framework que estrutura toda a aplicação. Ele organiza o código em **módulos**, cada um com suas próprias camadas. Leia a documentação oficial nesta ordem — ela segue o mesmo caminho que uma requisição HTTP percorre dentro do projeto:
+
+1. **[First Steps](https://docs.nestjs.com/first-steps)** — visão geral de como um projeto NestJS é estruturado.
+2. **[Controllers](https://docs.nestjs.com/controllers)** — a camada que recebe a requisição HTTP (rota, método, parâmetros). É o "porteiro" da aplicação: só direciona, não tem lógica de negócio.
+3. **[Providers / Services](https://docs.nestjs.com/providers)** — onde mora a lógica de negócio de verdade. O controller chama o service, o service faz o trabalho.
+4. **[Modules](https://docs.nestjs.com/modules)** — como controllers, services e outras dependências são agrupados por funcionalidade (ex: módulo de `task`, módulo de `health`).
+5. **[Pipes](https://docs.nestjs.com/pipes)** — validam e transformam dados de entrada antes de chegarem no controller (neste projeto, isso é feito com [Zod](https://zod.dev/), veja abaixo).
+6. **[Custom Providers](https://docs.nestjs.com/fundamentals/custom-providers)** — entenda como uma classe é registrada para ser injetada em outra (fundamental para entender o padrão *repository* usado aqui, onde o service depende do Prisma através de DI).
+
+> Não existe uma página "repository" separada na documentação do NestJS — no nosso caso, esse papel é feito pelo **PrismaClient** injetado diretamente nos services. Veja [Persistência & Migrations](/docs/architecture/persistence-and-migrations) para como isso funciona neste projeto.
+
+Depois de ler essas seis páginas, volte para [Visão Geral da Arquitetura](/docs/architecture/overview) — vai fazer muito mais sentido.
+
+## 🗄️ Prisma (ORM) e PostgreSQL
+
+- **[Prisma — Guia rápido (Quickstart)](https://www.prisma.io/docs/getting-started/quickstart)**: como o `schema.prisma` descreve as tabelas do banco.
+- **[Prisma Client — CRUD](https://www.prisma.io/docs/orm/prisma-client/queries/crud)**: como fazer consultas (`findMany`, `create`, `update`...) sem escrever SQL.
+- **[Prisma Migrate](https://www.prisma.io/docs/orm/prisma-migrate)**: como as migrations são geradas e aplicadas (`npm run migration:generate` e `npm run migration:run` usam isso por baixo).
+- **[PostgreSQL — Tutorial oficial](https://www.postgresql.org/docs/current/tutorial.html)**: se você nunca usou um banco relacional, vale rodar esse tutorial antes de mexer no schema.
+
+## 🔐 Autenticação: JWT e Keycloak
+
+O projeto não implementa login do zero — ele valida tokens emitidos por um serviço externo (Keycloak). Para entender esse fluxo:
+
+- **[Introdução a JWT (jwt.io)](https://jwt.io/introduction)**: o que é um JSON Web Token e por que ele carrega as informações do usuário.
+- **[O que é OpenID Connect / OAuth2 (artigo Keycloak)](https://www.keycloak.org/docs/latest/getting_started/)**: como o Keycloak se encaixa como servidor de autenticação.
+
+Depois de entender o básico, leia [Autenticação & Autorização](/docs/architecture/authentication) — a página explica o que é o Keycloak e traz um diagrama do fluxo completo, do login até a validação do token dentro do backend.
+
+## ✅ Validação de dados: Zod
+
+Todo dado que entra na API (body de um `POST`, query params, etc) passa por uma validação com [Zod](https://zod.dev/) antes de chegar no controller.
+
+- **[Zod — Basic usage](https://zod.dev/?id=basic-usage)**: como declarar um schema e validar um objeto.
+- **[nestjs-zod](https://www.npmjs.com/package/nestjs-zod)**: a biblioteca que conecta o Zod ao ciclo de vida do NestJS (usada nos DTOs deste projeto, como `PaginationQueryDto`).
+
+## 🧪 Testes: Vitest
+
+- **[Vitest — Getting Started](https://vitest.dev/guide/)**: como escrever e rodar um teste (`describe`, `it`, `expect`).
+- Depois de ler isso, veja o [Guia de Testes](/docs/guides/testing-guide) deste projeto para as convenções específicas usadas aqui.
+
+## 🧭 Como estudar isso na prática
+
+1. Leia a seção de conceitos no topo desta página.
+2. Suba o projeto seguindo o [Setup Rápido](/docs/setup/quick-start).
+3. Abra o código de um módulo simples, o [`health`](/docs/modules/health), e leia na ordem: `*.controller.ts` → `*.service.ts` → `*.module.ts`.
+4. Toda vez que encontrar um decorator ou conceito que não conhece (`@Injectable()`, `@Controller()`, pipe, DTO), volte para a documentação oficial correspondente listada acima.
+5. Só depois disso, avance para o módulo mais completo, [`task`](/docs/modules/task), que já usa banco de dados e paginação.

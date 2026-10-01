@@ -1,0 +1,24 @@
+---
+title: Visão Geral dos Módulos
+summary: Tabela de referência dos módulos presentes no boilerplate, suas rotas, responsabilidades e padrões adotados.
+---
+
+# Visão Geral dos Módulos
+
+O boilerplate inclui dois módulos funcionais que servem como exemplos vivos dos padrões de arquitetura e infraestrutura estabelecidos.
+
+---
+
+## 📊 Tabela de Referência de Módulos
+
+| Módulo | Tipo | Rota Base | Proteção | Responsabilidade Principal |
+|---|---|---|---|---|
+| **[HealthModule](/docs/modules/health)** | Infraestrutura | `/<nome-do-projeto>/api/health` | `@Public()` | Sonda de saúde (*liveness/readiness probe*) verificando a conectividade com o PostgreSQL via `@nestjs/terminus`. |
+| **[TaskModule](/docs/modules/task)** | Domínio / Referência | `/<nome-do-projeto>/api/v1/tasks` | Bearer JWT (`AuthGuard`) | Implementação completa de CRUD com paginação, validação Zod, Prisma (`PrismaService`) e testes unitários Vitest. |
+
+---
+
+## 🎯 Finalidade dos Módulos de Exemplo
+
+- **`HealthModule`**: Não deve ser removido em novos projetos, pois serve como endpoint essencial para Kubernetes, Docker Swarm ou balanceadores de carga verificarem a integridade da aplicação e do banco de dados.
+- **`TaskModule`**: Serve como **módulo de referência**. Pode ser utilizado como base de aprendizado para clonar ou ser removido/substituído pelas entidades reais do seu novo microsserviço.

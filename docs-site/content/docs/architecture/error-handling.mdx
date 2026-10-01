@@ -1,0 +1,159 @@
+---
+title: Tratamento de Erros & Exceções
+summary: Hierarquia de AppException, códigos de erro padronizados com ErrorCode, respostas no formato RFC 7807 (Problem Details) e filtro global HttpExceptionFilter.
+---
+
+# Tratamento de Erros & Exceções
+
+O boilerplate padroniza todas as respostas de erro da API através de uma hierarquia customizada de exceções de domínio e um filtro global de exceções que formata a saída conforme a [RFC 7807 (Problem Details for HTTP APIs)](https://www.rfc-editor.org/rfc/rfc7807).
+
+---
+
+## 🛑 Formato Padrão de Resposta de Erro (RFC 7807)
+
+Toda resposta HTTP com status de erro (4xx ou 5xx) é retornada com `Content-Type: application/problem+json` e a seguinte estrutura JSON:
+
+```json
+{
+  "type": "https://cincoders.example/problems/not-found",
+  "title": "Recurso não encontrado",
+  "status": 404,
+  "detail": "Tarefa com id \"d3b07384-d113-4f9e-b839-44589d978a3c\" não encontrado(a).",
+  "instance": "/cincoders/api/tasks/d3b07384-d113-4f9e-b839-44589d978a3c",
+  "code": "NOT_FOUND",
+  "timestamp": "2026-08-26T20:15:00.000Z"
+}
+```
+
+| Campo | Significado |
+|---|---|
+| `type` | URI estável identificando a classe do erro: `https://cincoders.example/problems/<code-em-kebab-case>`. |
+| `title` | Título humano, curto e fixo por `ErrorCode` (não varia entre ocorrências do mesmo tipo de erro). |
+| `status` | Código de status HTTP, repetido no corpo por conveniência do cliente. |
+| `detail` | Mensagem específica desta ocorrência do erro (pode variar por instância — ex: inclui o `id` do recurso). |
+| `instance` | Path da requisição que originou o erro. |
+| `code` | Código de máquina do `ErrorCode` (mesmo enum usado internamente, ver abaixo). |
+| `errors` | Presente apenas em erros de validação (`422`): mapa `{ campo: string[] }` com as mensagens agrupadas por campo. |
+
+O shape é documentado no Swagger pela classe `ProblemDetails` (`src/common/filters/problem-details.dto.ts`).
+
+> Respostas de **sucesso** continuam usando o envelope `{ statusCode, timestamp, path, data }` do `TransformInterceptor` — a RFC 7807 se aplica apenas a respostas de erro.
+
+---
+
+## 🏷️ Enum de Códigos de Erro: `ErrorCode`
+
+O enum `ErrorCode` (`src/common/exceptions/error-code.enum.ts`) define os códigos semânticos de máquina retornados no campo `code`:
+
+```typescript
+// src/common/exceptions/error-code.enum.ts
+export enum ErrorCode {
+  NOT_FOUND = 'NOT_FOUND',
+  VALIDATION_FAILED = 'VALIDATION_FAILED',
+  ACCESS_DENIED = 'ACCESS_DENIED',
+  CONFLICT = 'CONFLICT',
+  EXTERNAL_SERVICE_UNAVAILABLE = 'EXTERNAL_SERVICE_UNAVAILABLE',
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+}
+```
+
+---
+
+## 🧱 Hierarquia de Exceções: `AppException`
+
+Todas as exceções específicas de regras de negócio estendem a classe base `AppException` (`src/common/exceptions/app.exception.ts`):
+
+```typescript
+// src/common/exceptions/app.exception.ts
+import { HttpException, type HttpStatus } from '@nestjs/common';
+import type { ErrorCode } from './error-code.enum';
+
+export abstract class AppException extends HttpException {
+  constructor(
+    private readonly errorCode: ErrorCode,
+    message: string,
+    status: HttpStatus,
+  ) {
+    super({ message }, status);
+  }
+
+  getErrorCode(): ErrorCode {
+    return this.errorCode;
+  }
+}
+```
+
+### Exceções Pré-definidas
+
+1. **`ResourceNotFoundException`** (HTTP 404):
+   ```typescript
+   throw new ResourceNotFoundException('Tarefa', id);
+   // Mensagem gerada: "Tarefa com id \"...\" não encontrado(a)."
+   // Código: ErrorCode.NOT_FOUND
+   ```
+
+2. **`AccessDeniedException`** (HTTP 403):
+   ```typescript
+   throw new AccessDeniedException('Você não possui privilégios para executar esta ação.');
+   // Código: ErrorCode.ACCESS_DENIED
+   ```
+
+---
+
+## 🔍 Erros de Validação do Zod
+
+Quando o `ZodValidationPipe` rejeita um payload, ele lança `ZodValidationException` (ou `ZodError`).
+
+O `HttpExceptionFilter` intercepta o erro e agrupa as mensagens por campo no campo `errors`, retornando status HTTP `422 Unprocessable Entity`:
+
+```json
+{
+  "type": "https://cincoders.example/problems/validation-failed",
+  "title": "Dados inválidos",
+  "status": 422,
+  "detail": "Um ou mais campos precisam ser corrigidos.",
+  "instance": "/cincoders/api/tasks",
+  "code": "VALIDATION_FAILED",
+  "timestamp": "2026-08-26T20:15:00.000Z",
+  "errors": {
+    "title": ["String must contain at least 3 character(s)"],
+    "priority": ["Invalid enum value. Expected 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT', received 'URGENTE'"]
+  }
+}
+```
+
+---
+
+## ➕ Como Criar uma Nova Exceção de Domínio
+
+Para adicionar uma nova exceção customizada (por exemplo, conflito de e-mail duplicado):
+
+1. Crie o arquivo em `src/common/exceptions/<nome>.exception.ts`.
+2. Estenda `AppException` definindo o `ErrorCode` e o `HttpStatus`:
+
+```typescript
+// src/common/exceptions/email-already-in-use.exception.ts
+import { HttpStatus } from '@nestjs/common';
+import { AppException } from './app.exception';
+import { ErrorCode } from './error-code.enum';
+
+export class EmailAlreadyInUseException extends AppException {
+  constructor(email: string) {
+    super(
+      ErrorCode.CONFLICT,
+      `O e-mail "${email}" já está cadastrado no sistema.`,
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+```
+
+3. Lance a exceção diretamente dentro do seu service:
+
+```typescript
+if (existingUser) {
+  throw new EmailAlreadyInUseException(dto.email);
+}
+```
+
+O `HttpExceptionFilter` identificará automaticamente a instância de `AppException`, extraindo seu `ErrorCode` e status HTTP e montando a resposta no formato RFC 7807 sem necessidade de alterações no filtro global.

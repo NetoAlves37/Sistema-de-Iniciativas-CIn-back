@@ -1,0 +1,209 @@
+---
+title: Persistência & Migrations (Prisma)
+summary: Schema Prisma, padrão de tabelas de lookup para valores enumerados, PrismaService/PrismaModule e fluxo de migrations com Prisma CLI.
+---
+
+# Persistência & Migrations com Prisma
+
+O boilerplate utiliza o [Prisma](https://www.prisma.io/) com banco de dados relacional **PostgreSQL**. O `prisma/schema.prisma` é a fonte da verdade do schema: models, relações e migrations são derivados dele.
+
+---
+
+## 🗂️ Schema (`prisma/schema.prisma`)
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Task {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  statusId    Int
+  status      TaskStatus   @relation(fields: [statusId], references: [id])
+  priorityId  Int
+  priority    TaskPriority @relation(fields: [priorityId], references: [id])
+  dueDate     DateTime?
+  ownerId     String?      @db.Uuid
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([ownerId])
+  @@index([statusId])
+  @@index([priorityId])
+  @@map("tasks")
+}
+```
+
+---
+
+## 🧩 Padrão: Tabelas de Lookup em vez de Enum Nativo
+
+Valores enumerados (status de tarefa, prioridade, papel de usuário) **não** são modelados como `enum` nativo do Postgres/Prisma. Em vez disso, cada conjunto de valores vira uma tabela própria com `id` (chave inteira autoincrement) e `code` (string única usada no domínio):
+
+```prisma
+model TaskStatus {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  label String
+  tasks Task[]
+
+  @@map("task_statuses")
+}
+
+model TaskPriority {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  label String
+  tasks Task[]
+
+  @@map("task_priorities")
+}
+
+model UserRole {
+  id       Int           @id @default(autoincrement())
+  code     String        @unique
+  label    String
+  profiles UserProfile[]
+
+  @@map("user_roles")
+}
+```
+
+**Por quê**: um `enum` do Postgres exige uma migration de schema para adicionar, renomear ou remover um valor. Uma tabela de lookup permite alterar `code`/`label` com um `UPDATE`/`INSERT` comum, sem downtime de migration — importante para valores que tendem a evoluir (novos status de fluxo, novos papéis).
+
+Os models que usam esses valores referenciam a tabela via FK (`statusId`, `priorityId`, `roleId`) e trazem a relação com `include` quando o código (`status.code`) é necessário na camada de aplicação:
+
+```typescript
+const task = await this.prisma.task.findUnique({
+  where: { id },
+  include: { status: true, priority: true },
+});
+
+task.status.code; // 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+```
+
+Os códigos válidos ficam centralizados como constantes TypeScript no módulo de domínio (ex: `src/modules/task/task.constants.ts`, com `TASK_STATUS_CODES`/`TASK_PRIORITY_CODES`), usadas na validação dos DTOs Zod — sem precisar consultar o banco a cada request só para validar o valor de entrada.
+
+---
+
+## 🔌 PrismaService & PrismaModule
+
+`PrismaService` (`src/database/prisma.service.ts`) estende `PrismaClient` e gerencia o ciclo de vida da conexão:
+
+```typescript
+// src/database/prisma.service.ts
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { PrismaClient } from '@prisma/client';
+
+@Injectable()
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  async onModuleInit(): Promise<void> {
+    await this.$connect();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.$disconnect();
+  }
+}
+```
+
+`PrismaModule` (`src/database/prisma.module.ts`) é `@Global()`, então `PrismaService` fica disponível para injeção em qualquer módulo sem precisar importar `PrismaModule` explicitamente:
+
+```typescript
+// src/database/prisma.module.ts
+import { Global, Module } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
+
+@Global()
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],
+})
+export class PrismaModule {}
+```
+
+Em um service, basta injetar `PrismaService` e acessar o model:
+
+```typescript
+@Injectable()
+export class TaskService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  findAll() {
+    return this.prisma.task.findMany({ include: { status: true, priority: true } });
+  }
+}
+```
+
+---
+
+## 🌱 Configuração de `DATABASE_URL`
+
+O Prisma Client lê a connection string diretamente de `env("DATABASE_URL")` no schema. O boilerplate também aceita variáveis separadas (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`) por conveniência de configuração — `src/config/database.config.ts` monta a URL em runtime a partir delas quando `DATABASE_URL` não foi definida explicitamente:
+
+```typescript
+// src/config/database.config.ts
+export default registerAs('database', () => {
+  const url = buildDatabaseUrl(); // usa DATABASE_URL se existir, senão monta a partir de DB_*
+  process.env.DATABASE_URL ??= url;
+  return { url };
+});
+```
+
+> **Nota**: comandos da Prisma CLI (`migrate`, `generate`, `studio`) rodam fora do bootstrap do Nest e não executam esse factory — por isso `DATABASE_URL` também precisa estar definida no `.env` na raiz do projeto para esses comandos funcionarem.
+
+---
+
+## 🔄 Ciclo de Vida de Migrations
+
+Migrations ficam versionadas em `prisma/migrations/<timestamp>_<nome>/migration.sql`, geradas e aplicadas pela Prisma CLI — não há mais SQL escrito manualmente nem `synchronize` automático.
+
+### 1. Gerar e Aplicar uma Migration (ambiente de desenvolvimento)
+
+Após alterar `prisma/schema.prisma`, gere a migration comparando com o schema atual do banco e aplique-a imediatamente:
+
+```bash
+npm run migration:generate
+# equivalente a: prisma migrate dev --schema prisma/schema.prisma
+```
+
+Esse comando também regenera o Prisma Client automaticamente.
+
+### 2. Aplicar Migrations Pendentes (CI/produção)
+
+Para aplicar migrations já commitadas sem gerar novas (uso em pipelines e deploy):
+
+```bash
+npm run migration:run
+# equivalente a: prisma migrate deploy --schema prisma/schema.prisma
+```
+
+### 3. Regenerar o Prisma Client
+
+Necessário após um `git pull` que traga mudanças no schema sem alterar migrations localmente:
+
+```bash
+npm run prisma:generate
+```
+
+### 4. Reverter uma Migration
+
+O Prisma não tem um comando de "revert" automático como o TypeORM. Para desfazer uma alteração:
+
+- Em desenvolvimento: edite `schema.prisma` de volta ao estado anterior e rode `prisma migrate dev` novamente — isso gera uma nova migration corretiva.
+- Em produção: escreva manualmente uma migration SQL de reversão (`prisma migrate dev --create-only` para gerar o arquivo sem aplicar, editar o SQL, depois aplicar) e trate-a como uma migration normal, versionada no Git.
+
+---
+
+## 🌱 Seed
+
+`prisma/seed.mjs` popula as tabelas de lookup (`UserRole`, `TaskStatus`, `TaskPriority`) via `upsert` por `code`, sem duplicar linhas em execuções repetidas:
+
+```bash
+node prisma/seed.mjs
+```
+
+Novos códigos de domínio (ex: um novo status de tarefa) são adicionados nesse arquivo, não diretamente no banco.

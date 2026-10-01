@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TaskStatus {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  label String
+  tasks Task[]
+
+  @@map("task_statuses")
+}
+
+model TaskPriority {
+  id    Int    @id @default(autoincrement())
+  code  String @unique
+  label String
+  tasks Task[]
+
+  @@map("task_priorities")
+}
+
+model Task {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  statusId    Int
+  status      TaskStatus   @relation(fields: [statusId], references: [id])
+  priorityId  Int
+  priority    TaskPriority @relation(fields: [priorityId], references: [id])
+  dueDate     DateTime?
+  ownerId     String?      @db.Uuid
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([ownerId])
+  @@index([statusId])
+  @@index([priorityId])
+  @@map("tasks")
+}

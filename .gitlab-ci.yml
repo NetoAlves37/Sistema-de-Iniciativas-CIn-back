@@ -1,0 +1,57 @@
+# Builds and deploys docs-site/ only. This repo is a template for new NestJS
+# projects (see setup.sh) rather than a deployed service itself, so this does
+# not use the shared cincoders/platform/ci-templates release flow: that flow
+# versions the whole repo from conventional commits since the last tag, and
+# here it would pick up unrelated backend/template commits into docs-site's
+# history. This pipeline only builds an image and asks the target environment
+# to pull it — no semver, no CHANGELOG.
+
+stages:
+  - build
+  - deploy
+
+services:
+  - docker:dind
+
+variables:
+  CONTAINER_IMAGE: '$CI_REGISTRY_IMAGE/docs-site:latest'
+  DOCS_SITE_URL: 'https://cincoders.cin.ufpe.br/starter-kit/nestjs'
+
+# Only touch docs-site changes, and only from main — this repo has no
+# develop branch (see the ci-templates GitFlow), and the site has a single
+# deploy target.
+workflow:
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - docs-site/**/*
+        - .gitlab-ci.yml
+
+build-docs-site:
+  stage: build
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" $CI_REGISTRY
+  after_script:
+    - docker logout "$CI_REGISTRY"
+  script:
+    - docker build --pull -t $CONTAINER_IMAGE docs-site
+    - docker push $CONTAINER_IMAGE
+
+deploy-docs-site:
+  stage: deploy
+  needs:
+    - build-docs-site
+  before_script:
+    - apk add --update curl && rm -rf /var/cache/apk/*
+  script:
+    - |
+      if [ -z "$DOCS_SITE_DEPLOY_WEBHOOK_URL" ]; then
+        echo "❌ ERROR: DOCS_SITE_DEPLOY_WEBHOOK_URL is missing. Deployment aborted."
+        exit 1
+      fi
+    - curl -f -X POST "$DOCS_SITE_DEPLOY_WEBHOOK_URL"
+  environment:
+    name: production
+    url: $DOCS_SITE_URL

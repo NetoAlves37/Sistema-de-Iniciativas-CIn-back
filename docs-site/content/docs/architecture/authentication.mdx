@@ -1,0 +1,189 @@
+---
+title: Autenticação & Autorização (Keycloak)
+summary: Arquitetura de segurança stateless com Keycloak, validação JWT/JWKS via jose, controle de acesso fail-closed, decorators de usuário e papéis.
+---
+
+# Autenticação & Autorização com Keycloak
+
+O boilerplate adota uma política de segurança rigorosa e **fail-closed**: por padrão, **todos os endpoints da aplicação exigem um token Bearer válido**, a menos que sejam explicitamente liberados através do decorator `@Public()`.
+
+---
+
+## 🆔 O que é o Keycloak
+
+[Keycloak](https://www.keycloak.org/) é um **servidor de identidade e acesso** (IAM — *Identity and Access Management*) open source. Na prática, ele é uma aplicação separada (roda no seu próprio container, veja `docker compose up -d keycloak`) que centraliza:
+
+- **Cadastro e login de usuários** (username, senha, e opcionalmente login social).
+- **Emissão de tokens JWT** assinados criptograficamente, que provam "este usuário é quem diz ser" sem que o backend precise consultar um banco de senhas a cada requisição.
+- **Gestão de papéis (roles)**, como `admin` ou `user`, atribuídos a cada usuário dentro de um **realm** (um espaço isolado de configuração — pense nele como um "tenant" ou "projeto" dentro do Keycloak).
+
+O ponto chave: **este backend NUNCA vê a senha do usuário, e não guarda tokens em banco**. Quem autentica o usuário (login) é o Keycloak. O backend só recebe um token já pronto e verifica, matematicamente, se ele é autêntico e ainda válido. Essa abordagem é chamada de **stateless**: o backend não guarda sessão nenhuma, toda a informação necessária já está dentro do próprio token.
+
+Se você nunca ouviu falar de JWT ou OpenID Connect, volte para a [Leitura Obrigatória](/docs/setup/required-reading#-autenticação-jwt-e-keycloak) antes de continuar.
+
+### Fluxo completo: login + chamada autenticada à API
+
+O diagrama abaixo mostra as duas partes do processo: **(1)** o usuário obtendo um token no Keycloak, e **(2)** o backend validando esse token a cada requisição, sem nunca falar diretamente com o Keycloak sobre aquele usuário específico.
+
+```text
+ (1) LOGIN — o usuário troca credenciais por um token
+
+ ┌──────────┐                                   ┌────────────────────┐
+ │ Usuário/ │  1. login (usuário + senha)        │      Keycloak      │
+ │ Frontend │ ───────────────────────────────►  │   (realm: Local)   │
+ │          │                                   │                    │
+ │          │  2. Access Token (JWT) assinado    │                    │
+ │          │ ◄─────────────────────────────────│                    │
+ └──────────┘                                   └────────────────────┘
+      │
+      │  guarda o token (ex: memória, localStorage)
+      ▼
+
+ (2) CHAMADA À API — o token é enviado em toda requisição
+
+ Usuário/Frontend
+       │  3. GET /meu-servico/api/v1/tasks
+       │     Authorization: Bearer <token>
+       ▼
+ AuthGuard
+       │
+       ▼
+ KeycloakIdentitySource
+       │  4. busca chaves públicas (JWKS) do Keycloak
+       │     (cacheadas — KEYCLOAK_JWKS_CACHE_MAX_AGE —
+       │      não é feita a cada requisição)
+       ▼
+ 5. valida: assinatura, exp, issuer, audience
+       │
+       ▼
+ 6. extrai roles do payload do token e monta o CurrentUser
+       │
+       ▼
+ RolesGuard
+       │
+       ▼
+ Controller → Service → Prisma
+       │
+       ▼
+ 7. resposta (JSON com os dados) enviada de volta ao Usuário/Frontend
+```
+
+**Pontos importantes desse fluxo:**
+
+- O passo **(1)** só acontece no login. Depois disso, o mesmo token é reutilizado em toda requisição até expirar.
+- No passo **(4)**–**(5)**, o backend busca as **chaves públicas** do Keycloak (JWKS — *JSON Web Key Set*), não o token do usuário. É com essa chave pública que ele confere a assinatura do JWT. Essas chaves são cacheadas (`KEYCLOAK_JWKS_CACHE_MAX_AGE`), então o Keycloak não é chamado a cada requisição — só de tempos em tempos, para renovar o cache.
+- A validação do passo **(6)** é **local e criptográfica**: o backend nunca pergunta ao Keycloak "esse token é válido?". Ele mesmo confere a assinatura com a chave pública. Isso é o que torna o esquema *stateless* e rápido.
+- O papel do usuário (`ADMIN`, `USER`) já vem dentro do próprio token (`realm_access.roles`), então o passo **(7)** não faz nenhuma consulta a banco — só lê o payload do JWT já validado.
+
+---
+
+## 🔒 Como Funciona o Mecanismo
+
+A camada de autenticação é implementada em `src/common/auth/`:
+
+1. **`AuthModule`**: Registra `AuthGuard` e `RolesGuard` como guards globais no ciclo de vida do NestJS.
+2. **`KeycloakIdentitySource`**: Implementa a interface `IdentitySource`, sendo responsável por:
+   - Extrair o token do cabeçalho `Authorization: Bearer <token>`.
+   - Baixar e fazer cache das chaves criptográficas públicas do Keycloak (`/protocol/openid-connect/certs`) via JWKS com a biblioteca `jose`.
+   - Validar a assinatura do JWT, data de expiração (`exp`) e emissor (`issuer`).
+   - Validar a audiência (`aud` ou `azp`) contra o client backend configurado (`KEYCLOAK_CLIENT_ID=cincoders-back`).
+   - Mapear as roles de realm do Keycloak para o enum interno `AccessRole`.
+
+---
+
+## 🎭 Mapeamento de Papéis (`AccessRole`)
+
+O enum `AccessRole` (`src/common/auth/access-role.enum.ts`) define os níveis de privilégio da aplicação:
+
+```typescript
+// src/common/auth/access-role.enum.ts
+export enum AccessRole {
+  ADMIN = 'ADMIN',
+  USER = 'USER',
+}
+```
+
+O mapeamento entre as roles do token Keycloak (`realm_access.roles`) e os papéis internos é definido em `src/common/auth/identity/keycloak.identity-source.ts`:
+
+```typescript
+const REALM_ROLE_TO_ACCESS_ROLE: Record<string, AccessRole> = {
+  'sys_cincoders-admin': AccessRole.ADMIN,
+  'sys_cincoders-users': AccessRole.USER,
+};
+```
+
+> **Dica**: Caso seu realm no Keycloak utilize outros nomes de roles (ex: `coordenador`, `aluno`, `professor`), atualize o enum `AccessRole` e a tabela `REALM_ROLE_TO_ACCESS_ROLE` para refletir a sua taxonomia.
+
+---
+
+## 🛠️ Decorators de Segurança
+
+### 1. `@Public()`
+Ignora a validação de autenticação do `AuthGuard`. Utilizado em endpoints públicos ou sondas de infraestrutura:
+
+```typescript
+import { Public } from '@/common/decorators/public.decorator';
+
+@Get('status')
+@Public()
+getStatus() {
+  return { status: 'online' };
+}
+```
+
+### 2. `@Roles(...)`
+Restringe o acesso ao endpoint para usuários que possuam um dos papéis especificados:
+
+```typescript
+import { Roles } from '@/common/auth/decorators/roles.decorator';
+import { AccessRole } from '@/common/auth/access-role.enum';
+
+@Delete(':id')
+@Roles(AccessRole.ADMIN)
+remove(@Param('id') id: string) {
+  return this.service.remove(id);
+}
+```
+
+### 3. `@GetCurrentUser()`
+Injeta os dados do usuário autenticado (`CurrentUser`) extraídos do token JWT diretamente nos argumentos do método:
+
+```typescript
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+
+@Post()
+create(
+  @Body() dto: CreateTaskDto,
+  @GetCurrentUser() user: CurrentUser,
+) {
+  console.log(`Operação solicitada pelo usuário ID: ${user.userId}, papel: ${user.role}`);
+  return this.service.create(dto, user.userId);
+}
+```
+
+---
+
+## ⚙️ Variáveis de Ambiente do Keycloak
+
+As seguintes variáveis controlam a integração com o Keycloak:
+
+```ini
+KEYCLOAK_AUTH_SERVER_URL=http://localhost:8080/auth
+KEYCLOAK_REALM=Local
+KEYCLOAK_CLIENT_ID=cincoders-back
+KEYCLOAK_JWKS_CACHE_MAX_AGE=600000  # 10 minutos
+KEYCLOAK_JWKS_TIMEOUT=5000          # 5 segundos
+```
+
+---
+
+## 🚫 Desabilitando a Autenticação (Se Necessário)
+
+Se o projeto sendo desenvolvido for uma API totalmente aberta que não necessita de controle de acesso ou Keycloak:
+
+1. Remova a importação de `AuthModule` em `src/app.module.ts`.
+2. Remova a pasta `src/common/auth/`.
+3. Remova as variáveis de ambiente `KEYCLOAK_*` no `.env` e em `src/config/`.
+
+Com o `AuthModule` removido, todos os endpoints passam a operar de forma aberta por padrão.

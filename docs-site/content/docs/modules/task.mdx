@@ -1,0 +1,231 @@
+---
+title: Módulo Task (Referência CRUD)
+summary: Estudo de caso do módulo Task demonstrando a aplicação prática de todos os padrões do boilerplate (Controller, Service com PrismaService, DTO Zod, Testes).
+---
+
+# Módulo Task (Referência CRUD)
+
+O módulo `Task` (`src/modules/task/`) é a implementação canônica de um CRUD completo no boilerplate.
+
+---
+
+## 📂 Estrutura do Módulo
+
+```
+src/modules/task/
+├── dto/
+│   ├── create-task.dto.ts     # Schema Zod e DTO de criação
+│   └── update-task.dto.ts     # Schema .partial() e DTO de atualização
+├── task.constants.ts          # Códigos válidos de status/prioridade (TASK_STATUS_CODES, TASK_PRIORITY_CODES)
+├── task.type.ts                # Interface Task (shape serializado da resposta)
+├── task.controller.ts         # Controller REST com OpenAPI / Swagger
+├── task.module.ts             # Módulo NestJS
+├── task.service.ts            # Regras de negócio usando PrismaService
+└── task.service.spec.ts       # Testes unitários mockando PrismaService
+```
+
+Não há mais uma classe de entidade decorada (`@Entity`) — o modelo de dados vive em `prisma/schema.prisma`, e o módulo trabalha com o tipo gerado pelo Prisma Client mais a interface `Task` (`task.type.ts`) usada como shape de resposta.
+
+---
+
+## 🗄️ Modelo Prisma: `Task`
+
+Status e prioridade são tabelas de lookup (`TaskStatus`, `TaskPriority`), não enums nativos — veja [Persistência & Migrations](/docs/architecture/persistence-and-migrations) para o racional:
+
+```prisma
+// prisma/schema.prisma
+model Task {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  description String?
+  statusId    Int
+  status      TaskStatus   @relation(fields: [statusId], references: [id])
+  priorityId  Int
+  priority    TaskPriority @relation(fields: [priorityId], references: [id])
+  dueDate     DateTime?
+  ownerId     String?      @db.Uuid
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([ownerId])
+  @@index([statusId])
+  @@index([priorityId])
+  @@map("tasks")
+}
+```
+
+`ownerId` guarda o `sub` do token Keycloak do usuário autenticado que criou a tarefa (sem FK formal ainda — o módulo de perfil de usuário local é um passo futuro do boilerplate).
+
+Os códigos válidos de status e prioridade ficam centralizados em `task.constants.ts`:
+
+```typescript
+// src/modules/task/task.constants.ts
+export const TASK_STATUS_CODES = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
+export type TaskStatusCode = (typeof TASK_STATUS_CODES)[number];
+
+export const TASK_PRIORITY_CODES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+export type TaskPriorityCode = (typeof TASK_PRIORITY_CODES)[number];
+
+export const DEFAULT_TASK_STATUS: TaskStatusCode = 'PENDING';
+export const DEFAULT_TASK_PRIORITY: TaskPriorityCode = 'MEDIUM';
+```
+
+---
+
+## 📝 Schemas Zod & DTOs
+
+```typescript
+// src/modules/task/dto/create-task.dto.ts
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { TASK_PRIORITY_CODES, TASK_STATUS_CODES } from '../task.constants';
+
+export const CreateTaskSchema = z.object({
+  title: z.string().min(3).max(200).describe('Título da tarefa'),
+  description: z.string().optional().describe('Descrição detalhada'),
+  priority: z.enum(TASK_PRIORITY_CODES).optional().describe('Prioridade da tarefa'),
+  status: z.enum(TASK_STATUS_CODES).optional().describe('Status da tarefa'),
+  dueDate: z.string().date().optional().describe('Data de vencimento (YYYY-MM-DD)'),
+});
+
+export class CreateTaskDto extends createZodDto(CreateTaskSchema) {}
+```
+
+```typescript
+// src/modules/task/dto/update-task.dto.ts
+import { createZodDto } from 'nestjs-zod';
+import { CreateTaskSchema } from './create-task.dto';
+
+export const UpdateTaskSchema = CreateTaskSchema.partial();
+
+export class UpdateTaskDto extends createZodDto(UpdateTaskSchema) {}
+```
+
+---
+
+## ⚙️ Service com `PrismaService`
+
+O service injeta `PrismaService` (disponível globalmente via `PrismaModule`) e usa `include` para trazer o `code` das tabelas de lookup relacionadas:
+
+```typescript
+// src/modules/task/task.service.ts
+@Injectable()
+export class TaskService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(createTaskDto: CreateTaskDto, ownerId?: string): Promise<Task> {
+    const task = await this.prisma.task.create({
+      data: {
+        title: createTaskDto.title,
+        description: createTaskDto.description ?? null,
+        dueDate: createTaskDto.dueDate ? new Date(createTaskDto.dueDate) : null,
+        ownerId: ownerId ?? null,
+        status: { connect: { code: createTaskDto.status ?? DEFAULT_TASK_STATUS } },
+        priority: { connect: { code: createTaskDto.priority ?? DEFAULT_TASK_PRIORITY } },
+      },
+      include: { status: true, priority: true },
+    });
+    return this.serialize(task);
+  }
+
+  async findOne(id: string): Promise<Task> {
+    const task = await this.prisma.task.findUnique({
+      where: { id },
+      include: { status: true, priority: true },
+    });
+    if (!task) {
+      throw new ResourceNotFoundException('Tarefa', id);
+    }
+    return this.serialize(task);
+  }
+
+  // findAll, update e remove seguem o mesmo padrão: this.prisma.task.*
+}
+```
+
+`status`/`priority` são atualizados via `connect` pelo `code` (não pelo `id` numérico), mantendo o DTO e a API pública desacoplados da chave interna da tabela de lookup.
+
+---
+
+## 🎮 Controller REST
+
+```typescript
+// src/modules/task/task.controller.ts
+@ApiTags('Tasks')
+@ApiBearerAuth()
+@Controller('tasks')
+export class TaskController {
+  constructor(private readonly taskService: TaskService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Criar uma nova tarefa' })
+  @ApiResponse({ status: 201, description: 'Tarefa criada com sucesso' })
+  create(
+    @Body() createTaskDto: CreateTaskDto,
+    @GetCurrentUser() user?: CurrentUser,
+  ): Promise<Task> {
+    return this.taskService.create(createTaskDto, user?.userId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Listar tarefas paginadas' })
+  @ApiResponse({ status: 200, description: 'Lista paginada de tarefas retornada' })
+  findAll(@Query() query: PaginationQueryDto): Promise<PaginatedResponseDto<Task>> {
+    return this.taskService.findAll(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Buscar uma tarefa por ID' })
+  @ApiResponse({ status: 200, description: 'Tarefa encontrada' })
+  @ApiResponse({ status: 404, description: 'Tarefa não encontrada' })
+  findOne(@Param('id', ParseUUIDPipe) id: string): Promise<Task> {
+    return this.taskService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Atualizar uma tarefa' })
+  @ApiResponse({ status: 200, description: 'Tarefa atualizada' })
+  @ApiResponse({ status: 404, description: 'Tarefa não encontrada' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+  ): Promise<Task> {
+    return this.taskService.update(id, updateTaskDto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Remover uma tarefa' })
+  @ApiResponse({ status: 204, description: 'Tarefa removida' })
+  @ApiResponse({ status: 404, description: 'Tarefa não encontrada' })
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.taskService.remove(id);
+  }
+}
+```
+
+`ownerId` é preenchido a partir do `CurrentUser` extraído do token Keycloak (`@GetCurrentUser()`) — não há checagem de propriedade (usuário só vê/edita as próprias tarefas) implementada ainda; isso faz parte de uma etapa futura de autenticação por sessão.
+
+---
+
+## 🧪 Testes
+
+`task.service.spec.ts` mocka `PrismaService` com um objeto contendo apenas os métodos do model usados pelo service:
+
+```typescript
+const prisma = {
+  task: {
+    create: vi.fn(),
+    findMany: vi.fn(),
+    count: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+  },
+};
+
+const module: TestingModule = await Test.createTestingModule({
+  providers: [TaskService, { provide: PrismaService, useValue: prisma }],
+}).compile();
+```
+
+Veja o [Guia de Testes](/docs/guides/testing-guide) para o padrão completo de mock do Prisma.

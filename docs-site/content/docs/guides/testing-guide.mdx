@@ -1,0 +1,135 @@
+---
+title: Guia de Testes Automatizados (Vitest)
+summary: Como estruturar e executar testes unitários rápidos e isolados usando Vitest e mocks do PrismaService no NestJS.
+---
+
+# Guia de Testes Automatizados com Vitest
+
+O boilerplate utiliza o [Vitest](https://vitest.dev/) como test runner padrão devido ao seu alto desempenho, compatibilidade com TypeScript e suporte nativo a ESM.
+
+---
+
+## 🧪 Estrutura de um Teste Unitário (`*.spec.ts`)
+
+Os testes unitários devem ser colocados lado a lado com os arquivos que eles testam (ex: `product.service.spec.ts` junto de `product.service.ts`).
+
+### Exemplo Completo de Teste com Mock do `PrismaService`
+
+Como `PrismaService` estende `PrismaClient`, o mock é um objeto simples contendo apenas os métodos do model que o service efetivamente usa (`create`, `findMany`, `count`, `findUnique`, `update`, `delete`), injetado no lugar da classe real:
+
+```typescript
+// src/modules/task/task.service.spec.ts
+import { Test, type TestingModule } from '@nestjs/testing';
+import { ResourceNotFoundException } from '@/common/exceptions/resource-not-found.exception';
+import { PaginationQueryDto } from '@/common/pagination/pagination-query.dto';
+import { PrismaService } from '@/database/prisma.service';
+import { TaskService } from './task.service';
+
+describe('TaskService', () => {
+  let service: TaskService;
+  let prisma: {
+    task: {
+      create: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+      count: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+    };
+  };
+
+  const mockTask = {
+    id: 'a7b7c7d7-e7f7-4a7b-8c7d-7e7f7a7b7c7d',
+    title: 'Implementar autenticação',
+    description: 'Implementar JWT com refresh token',
+    dueDate: new Date('2026-12-31'),
+    ownerId: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    status: { code: 'PENDING' },
+    priority: { code: 'HIGH' },
+  };
+
+  beforeEach(async () => {
+    prisma = {
+      task: {
+        create: vi.fn(),
+        findMany: vi.fn(),
+        count: vi.fn(),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [TaskService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    service = module.get<TaskService>(TaskService);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('create', () => {
+    it('should create a task successfully', async () => {
+      const dto = { title: 'Implementar autenticação', priority: 'HIGH' as const };
+      prisma.task.create.mockResolvedValue(mockTask);
+
+      const result = await service.create(dto);
+
+      expect(prisma.task.create).toHaveBeenCalled();
+      expect(result.status).toBe('PENDING');
+    });
+  });
+
+  describe('findOne', () => {
+    it('should return a task by id', async () => {
+      prisma.task.findUnique.mockResolvedValue(mockTask);
+
+      const result = await service.findOne(mockTask.id);
+
+      expect(prisma.task.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: mockTask.id } }),
+      );
+      expect(result.id).toBe(mockTask.id);
+    });
+
+    it('should throw ResourceNotFoundException if task not found', async () => {
+      prisma.task.findUnique.mockResolvedValue(null);
+
+      await expect(service.findOne('nonexistent-id')).rejects.toThrow(ResourceNotFoundException);
+    });
+  });
+});
+```
+
+Note que os relacionamentos de lookup (`status`, `priority`) vêm como objetos `{ code: '...' }` no mock, espelhando o `include: { status: true, priority: true }` usado pelo service real.
+
+---
+
+## 🏃 Executando os Testes
+
+```bash
+# Executar todos os testes uma vez
+npm test
+
+# Executar testes em modo watch durante o desenvolvimento
+npm run test:watch
+
+# Gerar relatório de cobertura de código
+npm run test:cov
+
+# Executar testes end-to-end
+npm run test:e2e
+```
+
+---
+
+## 💡 Boas Práticas para Testes
+
+1. **Isole Dependências de Banco**: Nunca faça chamadas reais ao banco em testes unitários. Use `vi.fn()` para mockar apenas os métodos do model Prisma (`prisma.task.create`, `prisma.task.findMany`, etc.) que o service efetivamente chama.
+2. **Limpe Mocks no `afterEach`**: Chame `vi.clearAllMocks()` ao final de cada teste para evitar vazamento de estado entre os cenários.
+3. **Teste Caminhos Felizes e Exceções**: Certifique-se de testar tanto o retorno esperado quanto o lançamento de exceções de domínio como `ResourceNotFoundException`.

@@ -1,0 +1,24 @@
+{
+  "title": "CInCoders NestJS StarterKit",
+  "pages": [
+    "index",
+    "---Setup & Inicialização---",
+    "setup/required-reading",
+    "setup/quick-start",
+    "setup/keycloak-local",
+    "---Arquitetura---",
+    "architecture/overview",
+    "architecture/authentication",
+    "architecture/persistence-and-migrations",
+    "architecture/request-pipeline",
+    "architecture/error-handling",
+    "architecture/api-conventions",
+    "---Guias---",
+    "guides/module-scaffolding",
+    "guides/testing-guide",
+    "---Módulos---",
+    "modules/overview",
+    "modules/health",
+    "modules/task"
+  ]
+}

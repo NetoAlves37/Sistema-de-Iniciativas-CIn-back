@@ -1,0 +1,294 @@
+---
+title: Criação de Novos Módulos (Scaffolding)
+summary: Passo a passo completo para criar um novo módulo REST no boilerplate, incluindo model Prisma, DTOs Zod, service com PrismaService, controller e registro no AppModule.
+---
+
+# Criação de Novos Módulos (Scaffolding)
+
+Este guia apresenta o fluxo padrão para implementar uma nova funcionalidade no boilerplate através de um exemplo prático (módulo `products`).
+
+
+---
+
+## 📋 Checklist de Implementação
+
+- [ ] 1. Criar a pasta do módulo: `src/modules/<nome>/`
+- [ ] 2. Adicionar o model (e tabelas de lookup, se houver valores enumerados) em `prisma/schema.prisma`
+- [ ] 3. Gerar e aplicar a migration Prisma
+- [ ] 4. Criar os DTOs de criação e atualização com Zod em `dto/`
+- [ ] 5. Implementar o service injetando `PrismaService`
+- [ ] 6. Criar o controller com decorators Swagger e rotas REST
+- [ ] 7. Criar o módulo NestJS e importá-lo no `AppModule`
+- [ ] 8. Escrever testes unitários para o service com Vitest, mockando `PrismaService`
+
+---
+
+## Passo 1: Estrutura de Pastas
+
+Crie a estrutura de diretórios para o novo módulo:
+
+```bash
+mkdir -p src/modules/product/dto
+```
+
+---
+
+## Passo 2: Adicionar o Model no Prisma Schema
+
+Adicione o model em `prisma/schema.prisma`. Valores enumerados (como `category`) seguem o padrão do boilerplate: uma **tabela de lookup** com `id` (Int autoincrement) e `code` (string única), em vez de um `enum` nativo — veja [Persistência & Migrations](/docs/architecture/persistence-and-migrations) para o racional.
+
+```prisma
+// prisma/schema.prisma
+model ProductCategory {
+  id       Int       @id @default(autoincrement())
+  code     String    @unique
+  label    String
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  price      Decimal         @db.Decimal(10, 2)
+  categoryId Int
+  category   ProductCategory @relation(fields: [categoryId], references: [id])
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([categoryId])
+  @@map("products")
+}
+```
+
+---
+
+## Passo 3: Gerar e Aplicar a Migration
+
+Com o schema atualizado, gere e aplique a migration:
+
+```bash
+npm run migration:generate
+# equivalente a: prisma migrate dev --schema prisma/schema.prisma
+```
+
+Se o novo model introduziu uma tabela de lookup, adicione os valores iniciais em `prisma/seed.mjs` e rode `node prisma/seed.mjs`.
+
+---
+
+## Passo 4: Criar DTOs com Zod & `nestjs-zod`
+
+Declare o schema no Zod e gere a classe DTO com `createZodDto`. Os códigos válidos da tabela de lookup ficam centralizados como constantes TypeScript, no mesmo padrão de `task.constants.ts`:
+
+```typescript
+// src/modules/product/product.constants.ts
+export const PRODUCT_CATEGORY_CODES = ['HARDWARE', 'SOFTWARE', 'ACCESSORY'] as const;
+export type ProductCategoryCode = (typeof PRODUCT_CATEGORY_CODES)[number];
+```
+
+```typescript
+// src/modules/product/dto/create-product.dto.ts
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { PRODUCT_CATEGORY_CODES } from '../product.constants';
+
+export const CreateProductSchema = z.object({
+  name: z.string().min(3).max(200).describe('Nome do produto'),
+  price: z.number().min(0.01).describe('Preço do produto em reais'),
+  category: z.enum(PRODUCT_CATEGORY_CODES).optional().describe('Categoria do produto'),
+  isActive: z.boolean().optional().default(true).describe('Status de ativação'),
+});
+
+export class CreateProductDto extends createZodDto(CreateProductSchema) {}
+```
+
+Para a atualização parcial, utilize `.partial()`:
+
+```typescript
+// src/modules/product/dto/update-product.dto.ts
+import { createZodDto } from 'nestjs-zod';
+import { CreateProductSchema } from './create-product.dto';
+
+export const UpdateProductSchema = CreateProductSchema.partial();
+
+export class UpdateProductDto extends createZodDto(UpdateProductSchema) {}
+```
+
+---
+
+## Passo 5: Implementar o Service
+
+Injete `PrismaService` (disponível globalmente via `PrismaModule`) e utilize as exceções de domínio do boilerplate. Relações de lookup (`category`) são conectadas pelo `code`, não pelo `id` numérico interno:
+
+```typescript
+// src/modules/product/product.service.ts
+import { Injectable } from '@nestjs/common';
+import { ResourceNotFoundException } from '@/common/exceptions/resource-not-found.exception';
+import { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto';
+import type { PaginationQueryDto } from '@/common/pagination/pagination-query.dto';
+import { PrismaService } from '@/database/prisma.service';
+import type { CreateProductDto } from './dto/create-product.dto';
+import type { UpdateProductDto } from './dto/update-product.dto';
+
+@Injectable()
+export class ProductService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(dto: CreateProductDto) {
+    const product = await this.prisma.product.create({
+      data: {
+        name: dto.name,
+        price: dto.price,
+        isActive: dto.isActive ?? true,
+        category: { connect: { code: dto.category ?? 'HARDWARE' } },
+      },
+      include: { category: true },
+    });
+    return product;
+  }
+
+  async findAll(query: PaginationQueryDto) {
+    const [items, total] = await Promise.all([
+      this.prisma.product.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: query.skip,
+        take: query.take,
+        include: { category: true },
+      }),
+      this.prisma.product.count(),
+    ]);
+    return PaginatedResponseDto.of(items, total, query);
+  }
+
+  async findOne(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { category: true },
+    });
+    if (!product) {
+      throw new ResourceNotFoundException('Produto', id);
+    }
+    return product;
+  }
+
+  async update(id: string, dto: UpdateProductDto) {
+    await this.findOne(id);
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.price !== undefined ? { price: dto.price } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.category !== undefined ? { category: { connect: { code: dto.category } } } : {}),
+      },
+      include: { category: true },
+    });
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.findOne(id);
+    await this.prisma.product.delete({ where: { id } });
+  }
+}
+```
+
+---
+
+## Passo 6: Implementar o Controller
+
+```typescript
+// src/modules/product/product.controller.ts
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto';
+import type { PaginationQueryDto } from '@/common/pagination/pagination-query.dto';
+import type { CreateProductDto } from './dto/create-product.dto';
+import type { UpdateProductDto } from './dto/update-product.dto';
+import { ProductService } from './product.service';
+
+@ApiTags('Products')
+@ApiBearerAuth()
+@Controller('products')
+export class ProductController {
+  constructor(private readonly productService: ProductService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Cadastrar um novo produto' })
+  @ApiResponse({ status: 201, description: 'Produto criado com sucesso' })
+  create(@Body() dto: CreateProductDto) {
+    return this.productService.create(dto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Listar produtos paginados' })
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.productService.findAll(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Buscar produto por ID' })
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Atualizar dados de um produto' })
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateProductDto) {
+    return this.productService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Remover um produto' })
+  @ApiResponse({ status: 204, description: 'Produto removido com sucesso' })
+  remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.productService.remove(id);
+  }
+}
+```
+
+> Note que `TaskService`/`TaskController` usam `import { TaskService } ...` (não `import type`) para a injeção no construtor do controller — tipos usados como dependência injetável precisam ser importados como valor, senão o NestJS não consegue resolver a instância em runtime.
+
+---
+
+## Passo 7: Criar o Módulo e Importar no `AppModule`
+
+Como `PrismaModule` é `@Global()`, o módulo de domínio não precisa importá-lo explicitamente:
+
+```typescript
+// src/modules/product/product.module.ts
+import { Module } from '@nestjs/common';
+import { ProductController } from './product.controller';
+import { ProductService } from './product.service';
+
+@Module({
+  controllers: [ProductController],
+  providers: [ProductService],
+  exports: [ProductService],
+})
+export class ProductModule {}
+```
+
+Importe o `ProductModule` no array `imports` de `src/app.module.ts`:
+
+```typescript
+// src/app.module.ts
+@Module({
+  imports: [
+    // ... outros módulos
+    ProductModule,
+  ],
+})
+export class AppModule {}
+```

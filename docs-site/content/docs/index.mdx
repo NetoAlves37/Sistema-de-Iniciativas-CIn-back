@@ -1,0 +1,40 @@
+---
+title: CInCoders NestJS StarterKit
+description: Documentação técnica e arquitetural do boilerplate NestJS 11 com Prisma, Keycloak e Zod.
+---
+
+# CInCoders NestJS StarterKit
+
+Bem-vindo à documentação oficial do **CInCoders NestJS StarterKit** mantido pelo **CInCoders**.
+
+Este projeto fornece uma base estruturada, robusta e modular para a criação de microsserviços e APIs REST em Node.js com TypeScript, seguindo as melhores práticas de engenharia de software da comunidade.
+
+## ⚡ Stack Tecnológica
+
+| Componente | Ferramenta / Versão | Finalidade |
+|---|---|---|
+| **Runtime** | Node.js 22 LTS | Ambiente de execução JavaScript/TypeScript |
+| **Framework** | [NestJS 11](https://nestjs.com/) | Arquitetura modular com Injeção de Dependências (DI) |
+| **ORM** | [Prisma 5](https://www.prisma.io/) | Client type-safe, schema declarativo e Migrations |
+| **Banco de Dados** | [PostgreSQL 14+](https://www.postgresql.org/) | Banco de dados relacional primário |
+| **Autenticação** | [Keycloak](https://www.keycloak.org/) + [jose 6](https://github.com/panva/jose) | Validação JWT stateless via JWKS com política *fail-closed* |
+| **Validação** | [Zod 3](https://zod.dev/) + [nestjs-zod](https://www.npmjs.com/package/nestjs-zod) | Schemas únicos para validação, tipagem e OpenAPI |
+| **Documentação** | [Swagger / OpenAPI](https://swagger.io/) | Documentação interativa servida em `/api/docs` |
+| **Testes** | [Vitest 4](https://vitest.dev/) | Runner ultrarrápido de testes unitários e de integração |
+| **Qualidade & Lint** | [Biome 2](https://biomejs.dev/) | Linter e formatador de código de alto desempenho |
+| **Git Hooks** | [Husky 9](https://typicode.github.io/husky/) + [commitlint](https://commitlint.js.org/) | Validação de Conventional Commits pré-commit |
+
+## 📖 Nunca trabalhou com backend web? Comece aqui
+
+Se você ainda não tem experiência com APIs, ORMs ou frameworks web, **não pule direto para o setup**. Leia primeiro a [Leitura Obrigatória](/docs/setup/required-reading) — ela reúne os conceitos essenciais e a documentação oficial de cada tecnologia usada no projeto, na ordem certa para aprender.
+
+## 🧭 Tópicos Principais
+
+- **[Leitura Obrigatória](/docs/setup/required-reading)**: Conceitos e documentações essenciais antes de começar
+- **[Setup & Inicialização](/docs/setup/quick-start)**: Como gerar um novo projeto
+- **[Keycloak Local](/docs/setup/keycloak-local)**: Estrutura do realm pré-configurado
+- **[Visão Geral da Arquitetura](/docs/architecture/overview)**: Princípios arquiteturais
+- **[Autenticação & Autorização](/docs/architecture/authentication)**: Estratégia de segurança
+- **[Persistência & Migrations](/docs/architecture/persistence-and-migrations)**: Estrutura de dados
+- **[Criação de Módulos](/docs/guides/module-scaffolding)**: Guia passo a passo
+- **[Guia de Testes](/docs/guides/testing-guide)**: Testes unitários e integração
