@@ -10,7 +10,7 @@
     "realm": [
       {
         "name": "sys_sistema-de-iniciativas-cin-admin",
-        "description": "Acesso total (AccessRole.ADMIN)",
+        "description": "Administrador da aplicação (AccessRole.ADMIN): participa e decide como o comitê",
         "composite": false,
         "clientRole": false,
         "containerId": "sistema-de-iniciativas-cin",
@@ -19,6 +19,14 @@
       {
         "name": "sys_sistema-de-iniciativas-cin-users",
         "description": "Acesso padrão (AccessRole.USER)",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "sistema-de-iniciativas-cin",
+        "attributes": {}
+      },
+      {
+        "name": "sys_sistema-de-iniciativas-cin-comite",
+        "description": "Comitê avaliador (AccessRole.COMITE): fila de análise e decisão",
         "composite": false,
         "clientRole": false,
         "containerId": "sistema-de-iniciativas-cin",
@@ -45,9 +53,15 @@
         "description": "${role_default-roles}",
         "composite": true,
         "composites": {
-          "realm": ["offline_access", "uma_authorization"],
+          "realm": [
+            "offline_access",
+            "uma_authorization"
+          ],
           "client": {
-            "account": ["view-profile", "manage-account"]
+            "account": [
+              "view-profile",
+              "manage-account"
+            ]
           }
         },
         "clientRole": false,
@@ -63,9 +77,12 @@
     "clientRole": false,
     "containerId": "sistema-de-iniciativas-cin"
   },
-  "requiredCredentials": ["password"],
+  "requiredCredentials": [
+    "password"
+  ],
   "users": [
     {
+      "id": "00000000-0000-4000-a000-000000000006",
       "username": "admin",
       "enabled": true,
       "emailVerified": true,
@@ -87,6 +104,7 @@
       "groups": []
     },
     {
+      "id": "00000000-0000-4000-a000-000000000007",
       "username": "user",
       "enabled": true,
       "emailVerified": true,
@@ -105,6 +123,138 @@
         "sys_sistema-de-iniciativas-cin-users"
       ],
       "groups": []
+    },
+    {
+      "id": "00000000-0000-4000-a000-000000000001",
+      "username": "ana",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ana",
+      "lastName": "Souza",
+      "email": "ana@dev.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ana",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sistema-de-iniciativas-cin",
+        "sys_sistema-de-iniciativas-cin-users"
+      ],
+      "groups": [],
+      "attributes": {
+        "perfil": [
+          "aluno"
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-a000-000000000002",
+      "username": "bruno",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Bruno",
+      "lastName": "Lima",
+      "email": "bruno@dev.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bruno",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sistema-de-iniciativas-cin",
+        "sys_sistema-de-iniciativas-cin-users"
+      ],
+      "groups": [],
+      "attributes": {
+        "perfil": [
+          "professor"
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-a000-000000000003",
+      "username": "carla",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Carla",
+      "lastName": "Menezes",
+      "email": "carla@dev.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "carla",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sistema-de-iniciativas-cin",
+        "sys_sistema-de-iniciativas-cin-users",
+        "sys_sistema-de-iniciativas-cin-comite"
+      ],
+      "groups": [],
+      "attributes": {
+        "perfil": [
+          "professor"
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-a000-000000000004",
+      "username": "diego",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Diego",
+      "lastName": "Alves",
+      "email": "diego@dev.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "diego",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sistema-de-iniciativas-cin",
+        "sys_sistema-de-iniciativas-cin-users"
+      ],
+      "groups": [],
+      "attributes": {
+        "perfil": [
+          "aluno"
+        ]
+      }
+    },
+    {
+      "id": "00000000-0000-4000-a000-000000000005",
+      "username": "elisa",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Elisa",
+      "lastName": "Rocha",
+      "email": "elisa@dev.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "elisa",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "default-roles-sistema-de-iniciativas-cin",
+        "sys_sistema-de-iniciativas-cin-users",
+        "sys_sistema-de-iniciativas-cin-comite"
+      ],
+      "groups": [],
+      "attributes": {
+        "perfil": [
+          "professor"
+        ]
+      }
     }
   ],
   "clients": [
@@ -117,8 +267,12 @@
       "authorizationServicesEnabled": true,
       "rootUrl": "http://localhost:3000",
       "adminUrl": "http://localhost:3000",
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
       "secret": "dev-secret",
       "nodeReRegistrationTimeout": -1,
       "protocolMappers": [
@@ -160,10 +314,35 @@
             "claim.name": "clientAddress",
             "jsonType.label": "String"
           }
+        },
+        {
+          "name": "perfil",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "perfil",
+            "claim.name": "perfil",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ],
-      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
-      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
     },
     {
       "clientId": "sistema-de-iniciativas-cin-front",
@@ -173,8 +352,12 @@
       "serviceAccountsEnabled": false,
       "rootUrl": "http://localhost:5173",
       "adminUrl": "http://localhost:5173",
-      "redirectUris": ["http://localhost:5173/*"],
-      "webOrigins": ["http://localhost:5173"],
+      "redirectUris": [
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173"
+      ],
       "nodeReRegistrationTimeout": -1,
       "protocolMappers": [
         {
@@ -187,12 +370,50 @@
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
+        },
+        {
+          "name": "perfil",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "perfil",
+            "claim.name": "perfil",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
         }
       ],
-      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"],
-      "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
     }
   ],
-  "defaultDefaultClientScopes": ["role_list", "profile", "email", "roles", "web-origins", "acr"],
-  "defaultOptionalClientScopes": ["offline_access", "address", "phone", "microprofile-jwt"]
+  "defaultDefaultClientScopes": [
+    "role_list",
+    "profile",
+    "email",
+    "roles",
+    "web-origins",
+    "acr"
+  ],
+  "defaultOptionalClientScopes": [
+    "offline_access",
+    "address",
+    "phone",
+    "microprofile-jwt"
+  ],
+  "ssoSessionIdleTimeout": 1800
 }

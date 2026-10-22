@@ -9,6 +9,7 @@ import {
 import type { Request, Response } from 'express';
 import { ZodValidationException } from 'nestjs-zod';
 import { ZodError } from 'zod';
+import { DomainError, type TipoErroDominio, ValidacaoError } from '@/shared/domain/domain-error';
 import { AppException } from '../exceptions/app.exception';
 import { ErrorCode } from '../exceptions/error-code.enum';
 import type { ProblemDetails } from './problem-details.dto';
@@ -22,6 +23,13 @@ const ERROR_CODE_TITLE: Record<ErrorCode, string> = {
   [ErrorCode.CONFLICT]: 'Conflito de dados',
   [ErrorCode.EXTERNAL_SERVICE_UNAVAILABLE]: 'Serviço indisponível',
   [ErrorCode.INTERNAL_ERROR]: 'Erro interno do servidor',
+};
+
+const DOMAIN_ERROR_HTTP: Record<TipoErroDominio, { status: number; code: ErrorCode }> = {
+  validacao: { status: HttpStatus.UNPROCESSABLE_ENTITY, code: ErrorCode.VALIDATION_FAILED },
+  proibido: { status: HttpStatus.FORBIDDEN, code: ErrorCode.ACCESS_DENIED },
+  nao_encontrado: { status: HttpStatus.NOT_FOUND, code: ErrorCode.NOT_FOUND },
+  conflito: { status: HttpStatus.CONFLICT, code: ErrorCode.CONFLICT },
 };
 
 @Catch()
@@ -62,6 +70,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     detail: string;
     errors?: Record<string, string[]>;
   } {
+    if (exception instanceof DomainError) {
+      return this.fromDomainError(exception);
+    }
+
     if (exception instanceof ZodError) {
       return this.fromZodError(exception);
     }
@@ -90,6 +102,20 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code: ErrorCode.INTERNAL_ERROR,
       detail: 'Erro interno do servidor.',
     };
+  }
+
+  /**
+   * Traduz um erro de domínio para HTTP pela categoria (`tipo`): o domínio não conhece HTTP,
+   * e cada módulo só declara a categoria dos próprios erros. O `detail` é a mensagem em
+   * português do erro, pronta para a tela; erros de validação trazem `errors` por campo.
+   */
+  private fromDomainError(error: DomainError) {
+    const { status, code } = DOMAIN_ERROR_HTTP[error.tipo];
+    const errors =
+      error instanceof ValidacaoError
+        ? Object.fromEntries(Object.entries(error.campos).map(([campo, msg]) => [campo, [msg]]))
+        : undefined;
+    return { status, code, detail: error.message, ...(errors ? { errors } : {}) };
   }
 
   private fromZodError(error: ZodError) {
