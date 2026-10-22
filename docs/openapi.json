@@ -1,0 +1,1415 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/sistema-de-iniciativas-cin/api/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Aplicação saudável\n\nThe Health Check is successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {},
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Serviço indisponível\n\nThe Health Check is not successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "info": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": {
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      },
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "example": {
+                        "database": {
+                          "status": "up"
+                        },
+                        "redis": {
+                          "status": "down",
+                          "message": "Could not connect"
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                          "status"
+                        ],
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Verifica o status da aplicação e conexão com banco",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/me": {
+      "get": {
+        "operationId": "MeController_me_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Retorna o usuário autenticado, o perfil e os prazos configurados",
+        "tags": [
+          "Identidade"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas": {
+      "post": {
+        "operationId": "IniciativasController_submeter_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DadosIniciativaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Iniciativa criada em Em andamento (detalhe)"
+          },
+          "422": {
+            "description": "Campos inválidos (RN-01 e RN-02), com `errors` por campo"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submeter uma iniciativa (abre o refinamento)",
+        "tags": [
+          "Iniciativas"
+        ]
+      },
+      "get": {
+        "description": "Ex.: `status=EM_VOTACAO&ordenar=relevancia` (início) e `status=EM_ANDAMENTO&ordenar=prazo`.",
+        "operationId": "IniciativasController_listar_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "exclusiveMinimum": false,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "exclusiveMaximum": false,
+              "exclusiveMinimum": false,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filtro por status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EM_ANDAMENTO",
+                "EM_VOTACAO",
+                "EM_ANALISE",
+                "APROVADA",
+                "REPROVADA"
+              ]
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "description": "Filtro por tipo",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EXTENSAO",
+                "PESQUISA",
+                "EVENTO"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Busca em título, resumo, organizadores e espaço",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ordenar",
+            "required": false,
+            "in": "query",
+            "description": "Ordenação (padrão: recentes)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "relevancia",
+                "prazo",
+                "recentes",
+                "inicio"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de resumos de iniciativas"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar iniciativas (filtros, ordenação e paginação no servidor)",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/minhas": {
+      "get": {
+        "operationId": "IniciativasController_minhas_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "exclusiveMinimum": false,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "exclusiveMaximum": false,
+              "exclusiveMinimum": false,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filtro por status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EM_ANDAMENTO",
+                "EM_VOTACAO",
+                "EM_ANALISE",
+                "APROVADA",
+                "REPROVADA"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de resumos e `meta.contagemPorStatus`"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Minhas iniciativas, com a contagem por status",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/contagens": {
+      "get": {
+        "operationId": "IniciativasController_contagens_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`{ emAnalise }`"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Contagens para o menu (iniciativas em análise)",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}": {
+      "get": {
+        "operationId": "IniciativasController_detalhe_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalhe (inclui `permissoes`, `meuVoto` e `decisao`)"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalhe da iniciativa, com permissões calculadas para o usuário",
+        "tags": [
+          "Iniciativas"
+        ]
+      },
+      "patch": {
+        "operationId": "IniciativasController_editar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DadosIniciativaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detalhe atualizado"
+          },
+          "403": {
+            "description": "Só o autor edita"
+          },
+          "409": {
+            "description": "Status não permite edição"
+          },
+          "422": {
+            "description": "Campos inválidos"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Editar a própria iniciativa (só em Em andamento)",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/ressubmissao": {
+      "post": {
+        "operationId": "IniciativasController_ressubmeter_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DadosIniciativaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detalhe no ciclo seguinte, em Em andamento"
+          },
+          "403": {
+            "description": "Só o autor ressubmete"
+          },
+          "409": {
+            "description": "Só iniciativas reprovadas"
+          },
+          "422": {
+            "description": "Campos inválidos"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ressubmeter uma iniciativa reprovada (novo ciclo)",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/historico": {
+      "get": {
+        "operationId": "IniciativasController_historico_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de transições"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Histórico de transições de status (mais recente primeiro)",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/comentarios": {
+      "get": {
+        "description": "Ciclo mais recente primeiro e, dentro do ciclo, do mais antigo para o mais novo. Limite padrão: 50.",
+        "operationId": "ComentariosController_listar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "exclusiveMinimum": false,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "exclusiveMaximum": false,
+              "exclusiveMinimum": false,
+              "default": 50,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeComentariosResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          },
+          "422": {
+            "description": "Parâmetros de paginação inválidos"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista os comentários da iniciativa",
+        "tags": [
+          "Refinamento"
+        ]
+      },
+      "post": {
+        "description": "Só enquanto a iniciativa está Em andamento. Qualquer usuário, inclusive o autor.",
+        "operationId": "ComentariosController_comentar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarComentarioDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComentarioResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          },
+          "409": {
+            "description": "A fase de sugestões terminou"
+          },
+          "422": {
+            "description": "Texto vazio ou com mais de 1000 caracteres"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Comenta (sugere) na iniciativa",
+        "tags": [
+          "Refinamento"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/voto": {
+      "put": {
+        "description": "Mesmo valor que o usuário já tem retira o voto; valor oposto troca. Só em Em votação.",
+        "operationId": "VotoController_votar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarVotoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResultadoVotoResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autenticado"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          },
+          "409": {
+            "description": "A votação desta iniciativa foi encerrada"
+          },
+          "422": {
+            "description": "Valor do voto inválido"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra, troca ou retira o voto do usuário",
+        "tags": [
+          "Votação"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/divulgacao/aprovadas": {
+      "get": {
+        "description": "Visível a qualquer usuário autenticado. Ordenada pela data de início.",
+        "operationId": "DivulgacaoController_aprovadas_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "exclusiveMinimum": false,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "exclusiveMaximum": false,
+              "exclusiveMinimum": false,
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "description": "Busca em título, resumo, organizadores e espaço (sem diferenciar maiúsculas)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "description": "EXTENSAO, PESQUISA ou EVENTO",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EXTENSAO",
+                "PESQUISA",
+                "EVENTO"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de resumos de iniciativas aprovadas"
+          },
+          "401": {
+            "description": "Token ausente ou inválido"
+          },
+          "403": {
+            "description": "Sem permissão de acesso"
+          },
+          "422": {
+            "description": "Filtros ou paginação inválidos"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lista as iniciativas aprovadas",
+        "tags": [
+          "Divulgação"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/divulgacao/ocorrencias": {
+      "get": {
+        "description": "Intervalo `[de, ate)` de no máximo 62 dias. `inicio` e `fim` são `YYYY-MM-DD` (dia inteiro; `fim` exclusivo no Evento único) ou `YYYY-MM-DDTHH:mm`.",
+        "operationId": "DivulgacaoController_ocorrencias_v1",
+        "parameters": [
+          {
+            "name": "de",
+            "required": true,
+            "in": "query",
+            "description": "Início, inclusivo",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "ate",
+            "required": true,
+            "in": "query",
+            "description": "Fim, exclusivo (no máximo 62 dias depois de `de`)",
+            "schema": {
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipos",
+            "required": true,
+            "in": "query",
+            "description": "Lista separada por vírgulas de EXTENSAO, PESQUISA e EVENTO",
+            "schema": {}
+          },
+          {
+            "name": "minhas",
+            "required": true,
+            "in": "query",
+            "description": "Só as iniciativas do usuário logado",
+            "schema": {
+              "default": "false",
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de ocorrências em ordem cronológica"
+          },
+          "401": {
+            "description": "Token ausente ou inválido"
+          },
+          "403": {
+            "description": "Sem permissão de acesso"
+          },
+          "422": {
+            "description": "Datas inválidas ou intervalo maior que 62 dias"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ocorrências das aprovadas no calendário",
+        "tags": [
+          "Divulgação"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/avaliacao/fila": {
+      "get": {
+        "description": "Iniciativas em Em análise, ordenadas por relevância. `souAutor` indica as do próprio usuário.",
+        "operationId": "AvaliacaoController_fila_v1",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "exclusiveMinimum": false,
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 500,
+              "exclusiveMaximum": false,
+              "exclusiveMinimum": false,
+              "default": 20,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de resumos com `souAutor`"
+          },
+          "401": {
+            "description": "Token ausente ou inválido"
+          },
+          "403": {
+            "description": "O usuário não é do comitê nem administrador"
+          },
+          "422": {
+            "description": "Parâmetros de paginação inválidos"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fila de análise do comitê",
+        "tags": [
+          "Avaliação"
+        ]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/avaliacao/{id}/decisao": {
+      "post": {
+        "description": "Só em Em análise. O autor não decide a própria iniciativa. A reprovação exige justificativa.",
+        "operationId": "AvaliacaoController_decidir_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarDecisaoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detalhe da iniciativa atualizado"
+          },
+          "401": {
+            "description": "Token ausente ou inválido"
+          },
+          "403": {
+            "description": "Sem perfil de comitê, ou o usuário é o autor da iniciativa"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          },
+          "409": {
+            "description": "A iniciativa não está em análise ou já foi decidida"
+          },
+          "422": {
+            "description": "Resultado inválido ou justificativa ausente"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registra a decisão do comitê (aprovar ou reprovar)",
+        "tags": [
+          "Avaliação"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Sistema de Iniciativas - CIn API",
+    "description": "API documentation for sistema-de-iniciativas-cin",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      },
+      "oauth2": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "tokenUrl": "http://localhost:8080/auth/realms/Local/protocol/openid-connect/token",
+            "authorizationUrl": "http://localhost:8080/auth/realms/Local/protocol/openid-connect/auth",
+            "scopes": {}
+          }
+        }
+      }
+    },
+    "schemas": {
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Identificador do usuário (sub do token)",
+            "type": "string"
+          },
+          "nome": {
+            "description": "Nome para exibição",
+            "type": "string"
+          },
+          "perfil": {
+            "description": "Perfil de exibição: ALUNO, PROFESSOR, COMITE ou ADMIN",
+            "type": "string",
+            "enum": [
+              "ALUNO",
+              "PROFESSOR",
+              "COMITE",
+              "ADMIN"
+            ]
+          },
+          "ehComite": {
+            "description": "Pode ver a fila de análise e decidir (membro do comitê ou administrador)",
+            "type": "boolean"
+          },
+          "prazos": {
+            "description": "Prazos configurados, usados nos textos da tela",
+            "type": "object",
+            "properties": {
+              "refinamentoDias": {
+                "description": "Dias de refinamento (sugestões)",
+                "type": "number"
+              },
+              "votacaoDias": {
+                "description": "Dias de votação",
+                "type": "number"
+              }
+            },
+            "required": [
+              "refinamentoDias",
+              "votacaoDias"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "perfil",
+          "ehComite",
+          "prazos"
+        ]
+      },
+      "DadosIniciativaDto": {
+        "type": "object",
+        "properties": {
+          "tipo": {
+            "description": "Tipo: EXTENSAO, PESQUISA, EVENTO",
+            "type": "string"
+          },
+          "titulo": {
+            "description": "Título (até 120 caracteres)",
+            "type": "string"
+          },
+          "resumo": {
+            "description": "Descrição resumida (até 280 caracteres)",
+            "type": "string"
+          },
+          "detalhe": {
+            "description": "Descrição detalhada (até 5000 caracteres)",
+            "type": "string"
+          },
+          "inicio": {
+            "description": "Data de início (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "fim": {
+            "description": "Data de término (YYYY-MM-DD), igual ou posterior ao início",
+            "type": "string"
+          },
+          "horaInicio": {
+            "description": "Hora de início (HH:mm), junto com horaFim",
+            "type": "string",
+            "nullable": true
+          },
+          "horaFim": {
+            "description": "Hora de término (HH:mm), posterior ao início",
+            "type": "string",
+            "nullable": true
+          },
+          "periodicidade": {
+            "description": "Periodicidade: EVENTO_UNICO, DIARIA, SEMANAL, QUINZENAL, MENSAL",
+            "type": "string"
+          },
+          "espaco": {
+            "description": "Espaço utilizado (até 200 caracteres)",
+            "type": "string"
+          },
+          "organizadores": {
+            "description": "Organizadores, separados por vírgula (até 500)",
+            "type": "string"
+          },
+          "membros": {
+            "description": "Membros (opcional, até 500)",
+            "type": "string",
+            "nullable": true
+          },
+          "participantes": {
+            "description": "Quantidade de participantes (1 a 100000)",
+            "type": "number"
+          },
+          "comVotacao": {
+            "description": "Enviar para votação geral (padrão: true)",
+            "type": "boolean"
+          }
+        }
+      },
+      "PaginaDeComentariosResponseDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "ciclo": {
+                  "description": "Ciclo da iniciativa em que o comentário foi feito",
+                  "type": "integer"
+                },
+                "autor": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "nome": {
+                      "type": "string"
+                    },
+                    "perfil": {
+                      "type": "string",
+                      "enum": [
+                        "ALUNO",
+                        "PROFESSOR",
+                        "COMITE",
+                        "ADMIN"
+                      ]
+                    },
+                    "ehAutorDaIniciativa": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "nome",
+                    "perfil",
+                    "ehAutorDaIniciativa"
+                  ]
+                },
+                "texto": {
+                  "type": "string"
+                },
+                "criadoEm": {
+                  "description": "Data e hora em ISO 8601",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "ciclo",
+                "autor",
+                "texto",
+                "criadoEm"
+              ]
+            }
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "page": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "total": {
+                "type": "integer"
+              },
+              "totalPages": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "page",
+              "limit",
+              "total",
+              "totalPages"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "meta"
+        ]
+      },
+      "CriarComentarioDto": {
+        "type": "object",
+        "properties": {
+          "texto": {
+            "description": "Texto da sugestão (1 a 1000 caracteres após remover espaços nas pontas)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto"
+        ]
+      },
+      "ComentarioResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ciclo": {
+            "description": "Ciclo da iniciativa em que o comentário foi feito",
+            "type": "integer"
+          },
+          "autor": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nome": {
+                "type": "string"
+              },
+              "perfil": {
+                "type": "string",
+                "enum": [
+                  "ALUNO",
+                  "PROFESSOR",
+                  "COMITE",
+                  "ADMIN"
+                ]
+              },
+              "ehAutorDaIniciativa": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "nome",
+              "perfil",
+              "ehAutorDaIniciativa"
+            ]
+          },
+          "texto": {
+            "type": "string"
+          },
+          "criadoEm": {
+            "description": "Data e hora em ISO 8601",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ciclo",
+          "autor",
+          "texto",
+          "criadoEm"
+        ]
+      },
+      "RegistrarVotoDto": {
+        "type": "object",
+        "properties": {
+          "valor": {
+            "description": "1 (curtir) ou -1 (não curtir)",
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "minimum": -1,
+                "maximum": -1
+              }
+            ]
+          }
+        },
+        "required": [
+          "valor"
+        ]
+      },
+      "ResultadoVotoResponseDto": {
+        "type": "object",
+        "properties": {
+          "meuVoto": {
+            "description": "Voto atual; 0 = sem voto",
+            "oneOf": [
+              {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 1
+              },
+              {
+                "type": "number",
+                "minimum": -1,
+                "maximum": -1
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 0
+              }
+            ]
+          },
+          "likes": {
+            "type": "integer"
+          },
+          "dislikes": {
+            "type": "integer"
+          },
+          "relevancia": {
+            "description": "Limite inferior de Wilson (0 a 1) do ciclo atual",
+            "type": "number"
+          },
+          "acao": {
+            "type": "string",
+            "enum": [
+              "REGISTRADO",
+              "ALTERADO",
+              "RETIRADO"
+            ]
+          }
+        },
+        "required": [
+          "meuVoto",
+          "likes",
+          "dislikes",
+          "relevancia",
+          "acao"
+        ]
+      },
+      "RegistrarDecisaoDto": {
+        "type": "object",
+        "properties": {
+          "resultado": {
+            "description": "APROVADA ou REPROVADA",
+            "type": "string",
+            "enum": [
+              "APROVADA",
+              "REPROVADA"
+            ]
+          },
+          "justificativa": {
+            "description": "Obrigatória na reprovação (1 a 2000 caracteres); ignorada na aprovação",
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "resultado"
+        ]
+      }
+    }
+  }
+}
