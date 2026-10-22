@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:14.2
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: BD-SICIN
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d BD-SICIN"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: BD-SICIN
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/BD-SICIN
+      # Os testes unitários e e2e não falam com um Keycloak real, mas a validação de env
+      # exige a configuração no boot.
+      KEYCLOAK_AUTH_SERVER_URL: http://keycloak.test/auth
+      KEYCLOAK_REALM: Local
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+        env:
+          HUSKY: '0'
+
+      - name: Gerar o Prisma Client
+        run: npm run prisma:generate
+
+      - name: Lint (Biome)
+        run: npm run lint:ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Migrations contra o banco do CI
+        run: npm run migration:run
+
+      - name: Testes unitários e de arquitetura
+        run: npm test
+
+      - name: Testes de integração e e2e (Postgres real)
+        run: npm run test:e2e
+
+      - name: Build
+        run: npm run build

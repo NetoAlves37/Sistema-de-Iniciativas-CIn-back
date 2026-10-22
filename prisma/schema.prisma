@@ -7,39 +7,173 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model TaskStatus {
-  id    Int    @id @default(autoincrement())
-  code  String @unique
-  label String
-  tasks Task[]
+// ---------------------------------------------------------------------------
+// Domínio do Sistema de Iniciativas.
+//
+// Convenções (ver docs-site/architecture/persistence-and-migrations):
+//  - valores enumerados são tabelas de lookup (`id` Int + `code` único), nunca `enum` nativo;
+//  - tabelas prefixadas pelo módulo dono, colunas em snake_case via @map;
+//  - cada tabela tem um único módulo dono (comentário `/// owner:`). Só o dono lê e escreve
+//    (única exceção: a leitura em SQL da ordenação por relevância, ver docs/DECISOES.md);
+//  - entre módulos não há FK; ids de usuário são texto (o `sub` do Keycloak).
+// ---------------------------------------------------------------------------
 
-  @@map("task_statuses")
+/// owner: identidade
+model PerfilUsuario {
+  id       Int       @id @default(autoincrement())
+  code     String    @unique
+  label    String
+  usuarios Usuario[]
+
+  @@map("identidade_perfis")
 }
 
-model TaskPriority {
-  id    Int    @id @default(autoincrement())
-  code  String @unique
-  label String
-  tasks Task[]
+/// owner: identidade
+model Usuario {
+  /// Igual ao `sub` do token do Keycloak.
+  id           String        @id
+  nome         String
+  perfilId     Int           @map("perfil_id")
+  perfil       PerfilUsuario @relation(fields: [perfilId], references: [id])
+  atualizadoEm DateTime      @default(now()) @map("atualizado_em") @db.Timestamptz(3)
 
-  @@map("task_priorities")
+  @@index([perfilId])
+  @@map("identidade_usuarios")
 }
 
-model Task {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title       String
-  description String?
-  statusId    Int
-  status      TaskStatus   @relation(fields: [statusId], references: [id])
-  priorityId  Int
-  priority    TaskPriority @relation(fields: [priorityId], references: [id])
-  dueDate     DateTime?
-  ownerId     String?      @db.Uuid
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+/// owner: iniciativas
+model TipoIniciativa {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  label       String
+  iniciativas Iniciativa[]
 
-  @@index([ownerId])
-  @@index([statusId])
-  @@index([priorityId])
-  @@map("tasks")
+  @@map("iniciativas_tipos")
+}
+
+/// owner: iniciativas
+model Periodicidade {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique
+  label       String
+  iniciativas Iniciativa[]
+
+  @@map("iniciativas_periodicidades")
+}
+
+/// owner: iniciativas
+model StatusIniciativa {
+  id             Int                  @id @default(autoincrement())
+  code           String               @unique
+  label          String
+  iniciativas    Iniciativa[]
+  transicoesDe   TransicaoHistorico[] @relation("TransicaoDe")
+  transicoesPara TransicaoHistorico[] @relation("TransicaoPara")
+
+  @@map("iniciativas_status")
+}
+
+/// owner: iniciativas
+model Iniciativa {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  autorId         String           @map("autor_id")
+  tipoId          Int              @map("tipo_id")
+  tipo            TipoIniciativa   @relation(fields: [tipoId], references: [id])
+  titulo          String           @db.VarChar(120)
+  resumo          String           @db.VarChar(280)
+  detalhe         String           @db.Text
+  inicio          DateTime         @db.Date
+  fim             DateTime         @db.Date
+  /// HH:mm. Preenchida junto com `horaFim`, ou ambas nulas (dia inteiro).
+  horaInicio      String?          @map("hora_inicio") @db.VarChar(5)
+  horaFim         String?          @map("hora_fim") @db.VarChar(5)
+  periodicidadeId Int              @map("periodicidade_id")
+  periodicidade   Periodicidade    @relation(fields: [periodicidadeId], references: [id])
+  espaco          String           @db.VarChar(200)
+  organizadores   String           @db.VarChar(500)
+  membros         String?          @db.VarChar(500)
+  participantes   Int
+  comVotacao      Boolean          @default(true) @map("com_votacao")
+  statusId        Int              @map("status_id")
+  status          StatusIniciativa @relation(fields: [statusId], references: [id])
+  ciclo           Int              @default(1)
+  fimRefinamento  DateTime?        @map("fim_refinamento") @db.Timestamptz(3)
+  fimVotacao      DateTime?        @map("fim_votacao") @db.Timestamptz(3)
+  justificativa   String?          @db.VarChar(2000)
+  decisorId       String?          @map("decisor_id")
+  decididaEm      DateTime?        @map("decidida_em") @db.Timestamptz(3)
+  /// Concorrência otimista: incrementada a cada gravação.
+  version         Int              @default(0)
+  criadaEm        DateTime         @default(now()) @map("criada_em") @db.Timestamptz(3)
+  atualizadaEm    DateTime         @updatedAt @map("atualizada_em") @db.Timestamptz(3)
+
+  historico TransicaoHistorico[]
+
+  @@index([statusId, fimRefinamento])
+  @@index([statusId, fimVotacao])
+  @@index([autorId])
+  @@index([statusId, inicio])
+  @@map("iniciativas")
+}
+
+/// owner: iniciativas
+model TransicaoHistorico {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Ordem de gravação: desempata transições com o mesmo `ocorreuEm`.
+  seq           BigInt            @default(autoincrement())
+  iniciativaId  String            @map("iniciativa_id") @db.Uuid
+  iniciativa    Iniciativa        @relation(fields: [iniciativaId], references: [id], onDelete: Cascade)
+  ciclo         Int
+  deId          Int?              @map("de_id")
+  de            StatusIniciativa? @relation("TransicaoDe", fields: [deId], references: [id])
+  paraId        Int               @map("para_id")
+  para          StatusIniciativa  @relation("TransicaoPara", fields: [paraId], references: [id])
+  /// Id do usuário ou a constante `SISTEMA`.
+  por           String
+  nota          String
+  /// Preenchida quando a transição é uma reprovação (preserva o texto após a ressubmissão).
+  justificativa String?           @db.VarChar(2000)
+  ocorreuEm     DateTime          @map("ocorreu_em") @db.Timestamptz(3)
+
+  @@index([iniciativaId, ocorreuEm])
+  @@map("iniciativas_historico")
+}
+
+/// owner: refinamento
+model Comentario {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  iniciativaId String   @map("iniciativa_id") @db.Uuid
+  ciclo        Int
+  autorId      String   @map("autor_id")
+  texto        String   @db.VarChar(1000)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz(3)
+
+  @@index([iniciativaId, ciclo, criadoEm])
+  @@map("refinamento_comentarios")
+}
+
+/// owner: votacao
+model Voto {
+  iniciativaId String   @map("iniciativa_id") @db.Uuid
+  ciclo        Int
+  usuarioId    String   @map("usuario_id")
+  /// +1 (like) ou -1 (dislike); garantido por CHECK na migration.
+  valor        Int      @db.SmallInt
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz(3)
+
+  @@id([iniciativaId, ciclo, usuarioId])
+  @@map("votacao_votos")
+}
+
+/// owner: votacao
+model Placar {
+  iniciativaId String @map("iniciativa_id") @db.Uuid
+  ciclo        Int
+  likes        Int    @default(0)
+  dislikes     Int    @default(0)
+  relevancia   Float  @default(0)
+
+  @@id([iniciativaId, ciclo])
+  @@index([relevancia])
+  @@map("votacao_placar")
 }

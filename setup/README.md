@@ -8,12 +8,19 @@ desenvolvimento local — não use em produção.
 
 - **Realm**: `Local` (fixo, independente do nome do projeto)
 - **Roles** (padrão CIn `sys_<realm>-<perfil>`, iguais às do frontend):
-  `sys_sistema-de-iniciativas-cin-admin`, `sys_sistema-de-iniciativas-cin-users`
-- **Usuários de teste**:
-  | Usuário | Senha | Roles |
-  |---|---|---|
-  | `admin` | `admin` | `sys_sistema-de-iniciativas-cin-admin`, `sys_sistema-de-iniciativas-cin-users` |
-  | `user` | `user` | `sys_sistema-de-iniciativas-cin-users` |
+  `sys_sistema-de-iniciativas-cin-admin`, `sys_sistema-de-iniciativas-cin-users`,
+  `sys_sistema-de-iniciativas-cin-comite`
+- **Atributo de usuário `perfil`** (`aluno` ou `professor`): enviado no token pelo protocol mapper
+  `perfil` (claim `perfil`) nos dois clients. Para membros do comitê o perfil vem da role.
+- **Usuários de teste** (senha = nome de usuário; **só para desenvolvimento**, jamais em produção):
+  | Usuário | Senha | Perfil | Roles |
+  |---|---|---|---|
+  | `admin` | `admin` | administrador da aplicação | `-admin`, `-users` |
+  | `ana` | `ana` | Aluno | `-users` |
+  | `bruno` | `bruno` | Professor | `-users` |
+  | `carla` | `carla` | Comitê avaliador | `-users`, `-comite` |
+  | `diego` | `diego` | Aluno | `-users` |
+  | `elisa` | `elisa` | Comitê avaliador (2º membro, para testar o conflito de interesse) | `-users`, `-comite` |
 - **Clients**:
   | Client ID | Tipo | Uso |
   |---|---|---|
@@ -39,6 +46,6 @@ Assim como o resto do boilerplate, `realm.json` é varrido pelo `setup.sh`: toda
 ## Regerando o realm a partir de uma instância real
 
 Se precisar atualizar este arquivo a partir de um export real do Keycloak (`Export` no console,
-ou `kc.sh export`), mantenha só o essencial: roles de realm, os dois usuários de teste, os dois
+ou `kc.sh export`), mantenha só o essencial: roles de realm, os usuários de teste, os dois
 clients e os `defaultClientScopes`/`optionalClientScopes`. Não copie IDs (`uuid`), segredos reais,
 nem clients/roles específicos de outros projetos.

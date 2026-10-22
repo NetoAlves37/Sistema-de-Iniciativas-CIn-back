@@ -1,6 +1,7 @@
 import type { ArgumentsHost } from '@nestjs/common';
 import { ForbiddenException, HttpStatus } from '@nestjs/common';
 import { z } from 'zod';
+import { DomainError, type TipoErroDominio, ValidacaoError } from '@/shared/domain/domain-error';
 import { ResourceNotFoundException } from '../exceptions/resource-not-found.exception';
 import { HttpExceptionFilter } from './http-exception.filter';
 
@@ -88,5 +89,56 @@ describe('HttpExceptionFilter', () => {
         detail: 'Erro interno do servidor.',
       }),
     );
+  });
+
+  describe('erros de domínio', () => {
+    class ErroXpto extends DomainError {
+      readonly code = 'XPTO';
+      constructor(
+        readonly tipo: TipoErroDominio,
+        mensagem: string,
+      ) {
+        super(mensagem);
+      }
+    }
+
+    it.each([
+      ['validacao', 422, 'VALIDATION_FAILED'],
+      ['proibido', 403, 'ACCESS_DENIED'],
+      ['nao_encontrado', 404, 'NOT_FOUND'],
+      ['conflito', 409, 'CONFLICT'],
+    ] as const)('categoria %s vira HTTP %i (%s) com a mensagem em português no detail', (tipo, status, code) => {
+      const { host, statusMock, jsonMock } = createMockHost();
+
+      filter.catch(new ErroXpto(tipo, 'Mensagem pronta para a tela.'), host);
+
+      expect(statusMock).toHaveBeenCalledWith(status);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({ status, code, detail: 'Mensagem pronta para a tela.' }),
+      );
+    });
+
+    it('ValidacaoError devolve errors por campo, com listas de mensagens', () => {
+      const { host, statusMock, jsonMock } = createMockHost();
+
+      filter.catch(
+        new ValidacaoError({
+          titulo: 'Informe o título.',
+          fim: 'A data de término deve ser igual ou posterior à de início.',
+        }),
+        host,
+      );
+
+      expect(statusMock).toHaveBeenCalledWith(422);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'VALIDATION_FAILED',
+          errors: {
+            titulo: ['Informe o título.'],
+            fim: ['A data de término deve ser igual ou posterior à de início.'],
+          },
+        }),
+      );
+    });
   });
 });
