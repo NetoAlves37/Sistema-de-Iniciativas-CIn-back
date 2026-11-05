@@ -7,3 +7,28 @@ coverage
 tsconfig.tsbuildinfo
 tsconfig.build.tsbuildinfo
 .codegraph
+
+# Arquivos de ferramentas/agentes de IA
+CLAUDE.md
+AGENTS.md
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.aider*
+.github/copilot-instructions.md
+.codegraph
+docs/PROMPT.md
+
+# Recursos de IA do docs-site (botões ChatGPT/Claude e rotas llms.*)
+docs-site/src/components/ai/
+docs-site/src/app/llms.txt/
+docs-site/src/app/llms-full.txt/
+docs-site/src/app/llms.mdx/
+
+# Relatórios gerados durante o trabalho com IA (citam o prompt/sessão)
+docs/PLANO.md
+docs/DECISOES.md
+docs/QUALIDADE.md
+docs/RASTREABILIDADE.md
+docs/RELATORIO_FINAL.md

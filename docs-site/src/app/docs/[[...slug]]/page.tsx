@@ -1,15 +1,8 @@
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/layouts/docs/page';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
 import { getPageImage, source } from '@/lib/source';
 import { getMDXComponents } from '@/mdx-components';
-
-const gitConfig = {
-  baseUrl: 'https://gitlab.cin.ufpe.br/cincoders/platform/cincoders-nestjs-boilerplate',
-  branch: 'main',
-  contentPath: 'docs-site/content/docs',
-};
 
 export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   const params = await props.params;
@@ -26,14 +19,7 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
       {!page.data.full && (
         <>
           <DocsTitle>{page.data.title}</DocsTitle>
-          <DocsDescription className="mb-0">{page.data.description}</DocsDescription>
-          <div className="flex flex-row items-center gap-2 border-b pb-6">
-            <LLMCopyButton markdownUrl={`${page.url}.mdx`} />
-            <ViewOptions
-              markdownUrl={`${page.url}.mdx`}
-              githubUrl={`${gitConfig.baseUrl}/-/blob/${gitConfig.branch}/${gitConfig.contentPath}/${page.path}`}
-            />
-          </div>
+          <DocsDescription>{page.data.description}</DocsDescription>
         </>
       )}
       <DocsBody>
