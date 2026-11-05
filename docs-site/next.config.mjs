@@ -7,14 +7,6 @@ const config = {
   reactStrictMode: true,
   // Standalone output is what the Dockerfile copies into the runtime image.
   output: 'standalone',
-  async rewrites() {
-    return [
-      {
-        source: '/docs/:path*.mdx',
-        destination: '/llms.mdx/docs/:path*',
-      },
-    ];
-  },
 };
 
 export default withMDX(config);

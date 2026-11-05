@@ -38,7 +38,7 @@ docker compose up -d
 npm run prisma:generate
 npm run migration:run
 
-# 4. (Opcional) Popular tabelas de lookup (roles, status, priority)
+# 4. (Opcional) Reconciliar os rótulos das tabelas de lookup (já criadas pela migration)
 node prisma/seed.mjs
 
 # 5. Iniciar a API em modo watch
@@ -51,7 +51,16 @@ O arquivo `.env` já foi criado pelo gerador a partir do `.env.example`. Ajuste 
 - **Health Check**: `http://localhost:3000/sistema-de-iniciativas-cin/api/health` (público, sem versionamento)
 - **Documentação Swagger**: `http://localhost:3000/api/docs`
 - **Keycloak Admin**: `http://localhost:8080/auth` (admin/admin, realm: `Local`)
-- **Usuários de teste**: `admin`/`admin` (roles `sys_sistema-de-iniciativas-cin-admin` e `sys_sistema-de-iniciativas-cin-users`) e `user`/`user` (role `sys_sistema-de-iniciativas-cin-users`)
+- **Usuários de teste** (senha = nome de usuário; só para desenvolvimento, ver `setup/README.md`):
+
+  | Usuário | Perfil | Roles |
+  |---|---|---|
+  | `admin` | administrador da aplicação | `-admin`, `-users` |
+  | `ana`, `diego` | Aluno | `-users` |
+  | `bruno` | Professor | `-users` |
+  | `carla`, `elisa` | Comitê avaliador | `-users`, `-comite` |
+
+> Se a porta 5432 já estiver ocupada (por exemplo, por um Postgres instalado na máquina), defina `DB_PORT=5433` e ajuste a porta em `DATABASE_URL` no `.env`.
 
 ---
 
@@ -64,7 +73,9 @@ O arquivo `.env` já foi criado pelo gerador a partir do `.env.example`. Ajuste 
 | `npm run start:prod` | Inicia a aplicação a partir da pasta compilada `dist/` |
 | `npm run lint` | Executa o linter Biome e aplica correções automáticas |
 | `npm run format` | Formata o código com Biome |
-| `npm test` | Executa a suíte de testes unitários com Vitest |
+| `npm run typecheck` | Verifica os tipos de `src/` e `test/` |
+| `npm test` | Executa os testes unitários e o de arquitetura (Vitest) |
+| `npm run test:e2e` | Executa os testes e2e contra um Postgres real (precisa do `docker compose up -d postgres`) |
 | `npm run test:watch` | Executa os testes unitários em modo watch |
 | `npm run test:cov` | Executa os testes e gera relatório de cobertura |
 | `npm run prisma:generate` | Gera o Prisma Client a partir de `prisma/schema.prisma` |

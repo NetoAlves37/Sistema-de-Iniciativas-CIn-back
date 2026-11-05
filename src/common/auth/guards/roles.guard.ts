@@ -22,7 +22,7 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const user = request.user;
 
-    if (!user || !requiredRoles.includes(user.role)) {
+    if (!user?.roles.some((role) => requiredRoles.includes(role))) {
       throw new AccessDeniedException('Você não tem permissão para acessar este recurso.');
     }
 
