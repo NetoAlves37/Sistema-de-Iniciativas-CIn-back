@@ -15,9 +15,13 @@ import type { TransacaoPort } from './application/ports/transacao.port';
 import type { UsuariosPort } from './application/ports/usuarios.port';
 import type { VotosPort } from './application/ports/votos.port';
 import { ConsultasIniciativas } from './application/queries/consultas-iniciativas';
+import { AlterarIniciativa } from './application/use-cases/alterar-iniciativa';
 import { AplicarPrazosVencidos } from './application/use-cases/aplicar-prazos-vencidos';
 import { CarregarComPrazos } from './application/use-cases/carregar-com-prazos';
-import { ComandosIniciativa } from './application/use-cases/comandos';
+import { DecidirIniciativa } from './application/use-cases/decidir-iniciativa';
+import { EditarIniciativa } from './application/use-cases/editar-iniciativa';
+import { RessubmeterIniciativa } from './application/use-cases/ressubmeter-iniciativa';
+import { SubmeterIniciativa } from './application/use-cases/submeter-iniciativa';
 import type { IniciativaRepository } from './domain/ports/iniciativa.repository';
 import type { PrazosConfig } from './domain/ports/prazos-config';
 import { EventosAdapter } from './infrastructure/adapters/eventos.adapter';
@@ -73,23 +77,43 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
       inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CLOCK, PRAZOS_CONFIG],
     },
     {
-      provide: ComandosIniciativa,
+      provide: SubmeterIniciativa,
       useFactory: (
         repositorio: IniciativaRepository,
         transacao: TransacaoPort,
         eventos: EventosPort,
         clock: Clock,
         prazos: PrazosConfig,
+      ) => new SubmeterIniciativa(repositorio, transacao, eventos, clock, prazos),
+      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CLOCK, PRAZOS_CONFIG],
+    },
+    {
+      provide: AlterarIniciativa,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
         carregar: CarregarComPrazos,
-      ) => new ComandosIniciativa({ repositorio, transacao, eventos, clock, prazos, carregar }),
-      inject: [
-        INICIATIVA_REPOSITORY,
-        TRANSACAO_PORT,
-        EVENTOS_PORT,
-        CLOCK,
-        PRAZOS_CONFIG,
-        CarregarComPrazos,
-      ],
+      ) => new AlterarIniciativa(repositorio, transacao, eventos, carregar),
+      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CarregarComPrazos],
+    },
+    {
+      provide: EditarIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new EditarIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
+    },
+    {
+      provide: RessubmeterIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock, prazos: PrazosConfig) =>
+        new RessubmeterIniciativa(alterar, clock, prazos),
+      inject: [AlterarIniciativa, CLOCK, PRAZOS_CONFIG],
+    },
+    {
+      provide: DecidirIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new DecidirIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
     },
     {
       provide: ConsultasIniciativas,
@@ -130,12 +154,23 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
     {
       provide: IniciativasFacade,
       useFactory: (
-        comandos: ComandosIniciativa,
+        submeter: SubmeterIniciativa,
+        editar: EditarIniciativa,
+        ressubmeter: RessubmeterIniciativa,
+        decidir: DecidirIniciativa,
         consultas: ConsultasIniciativas,
         carregar: CarregarComPrazos,
         job: AplicarPrazosVencidos,
-      ) => new IniciativasFacade(comandos, consultas, carregar, job),
-      inject: [ComandosIniciativa, ConsultasIniciativas, CarregarComPrazos, AplicarPrazosVencidos],
+      ) => new IniciativasFacade(submeter, editar, ressubmeter, decidir, consultas, carregar, job),
+      inject: [
+        SubmeterIniciativa,
+        EditarIniciativa,
+        RessubmeterIniciativa,
+        DecidirIniciativa,
+        ConsultasIniciativas,
+        CarregarComPrazos,
+        AplicarPrazosVencidos,
+      ],
     },
     TransicoesJob,
   ],

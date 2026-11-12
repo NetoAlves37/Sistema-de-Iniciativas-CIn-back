@@ -14,7 +14,10 @@ import type {
 import type { ConsultasIniciativas } from './queries/consultas-iniciativas';
 import type { AplicarPrazosVencidos } from './use-cases/aplicar-prazos-vencidos';
 import type { CarregarComPrazos } from './use-cases/carregar-com-prazos';
-import type { ComandosIniciativa } from './use-cases/comandos';
+import type { DecidirIniciativa } from './use-cases/decidir-iniciativa';
+import type { EditarIniciativa } from './use-cases/editar-iniciativa';
+import type { RessubmeterIniciativa } from './use-cases/ressubmeter-iniciativa';
+import type { SubmeterIniciativa } from './use-cases/submeter-iniciativa';
 
 export type * from './dto/iniciativa.dto';
 
@@ -43,7 +46,10 @@ export interface FiltroCalendarioInput {
  */
 export class IniciativasFacade {
   constructor(
-    private readonly comandos: ComandosIniciativa,
+    private readonly submeterIniciativa: SubmeterIniciativa,
+    private readonly editarIniciativa: EditarIniciativa,
+    private readonly ressubmeterIniciativa: RessubmeterIniciativa,
+    private readonly decidirIniciativa: DecidirIniciativa,
     private readonly consultas: ConsultasIniciativas,
     private readonly carregar: CarregarComPrazos,
     private readonly job: AplicarPrazosVencidos,
@@ -75,7 +81,7 @@ export class IniciativasFacade {
    * não existir. A validação da justificativa fica no caso de uso de `avaliacao`.
    */
   registrarDecisao(input: RegistrarDecisaoInput): Promise<void> {
-    return this.comandos.decidir(
+    return this.decidirIniciativa.executar(
       input.iniciativaId,
       input.decisorId,
       input.resultado,
@@ -101,15 +107,15 @@ export class IniciativasFacade {
   // --- usado pelos controllers e pelo job do próprio módulo ---------------------------------
 
   submeter(autorId: string, entrada: DadosIniciativaInput): Promise<string> {
-    return this.comandos.submeter(autorId, entrada);
+    return this.submeterIniciativa.executar(autorId, entrada);
   }
 
   editar(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
-    return this.comandos.editar(id, usuarioId, entrada);
+    return this.editarIniciativa.executar(id, usuarioId, entrada);
   }
 
   ressubmeter(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
-    return this.comandos.ressubmeter(id, usuarioId, entrada);
+    return this.ressubmeterIniciativa.executar(id, usuarioId, entrada);
   }
 
   minhas(autorId: string, filtro: { status?: StatusIniciativa; page: number; limit: number }) {
