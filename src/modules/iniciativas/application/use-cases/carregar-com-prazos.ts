@@ -1,10 +1,10 @@
 import type { Clock } from '@/shared/domain/clock';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
 import type { Iniciativa } from '../../domain/iniciativa';
 import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
 import type { PrazosConfig } from '../../domain/ports/prazos-config';
 import type { EventosPort } from '../ports/eventos.port';
-import type { TransacaoPort } from '../ports/transacao.port';
 
 const TENTATIVAS = 3;
 

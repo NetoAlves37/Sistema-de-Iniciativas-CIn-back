@@ -1,11 +1,11 @@
 import type { Clock } from '@/shared/domain/clock';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import { Iniciativa } from '../../domain/iniciativa';
 import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
 import type { PrazosConfig } from '../../domain/ports/prazos-config';
 import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
 import type { DadosIniciativaInput } from '../dto/iniciativa.dto';
 import type { EventosPort } from '../ports/eventos.port';
-import type { TransacaoPort } from '../ports/transacao.port';
 
 /** RN-01 a RN-03. */
 export class SubmeterIniciativa {

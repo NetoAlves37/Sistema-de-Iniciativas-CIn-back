@@ -1,6 +1,5 @@
 import type { DadosIniciativaInput } from '@/modules/iniciativas/application/dto/iniciativa.dto';
 import type { EventosPort } from '@/modules/iniciativas/application/ports/eventos.port';
-import type { TransacaoPort } from '@/modules/iniciativas/application/ports/transacao.port';
 import { AlterarIniciativa } from '@/modules/iniciativas/application/use-cases/alterar-iniciativa';
 import { AplicarPrazosVencidos } from '@/modules/iniciativas/application/use-cases/aplicar-prazos-vencidos';
 import { CarregarComPrazos } from '@/modules/iniciativas/application/use-cases/carregar-com-prazos';
@@ -9,6 +8,7 @@ import { EditarIniciativa } from '@/modules/iniciativas/application/use-cases/ed
 import { RessubmeterIniciativa } from '@/modules/iniciativas/application/use-cases/ressubmeter-iniciativa';
 import { SubmeterIniciativa } from '@/modules/iniciativas/application/use-cases/submeter-iniciativa';
 import type { DomainEvent } from '@/shared/domain/domain-event';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import { FakeClock } from '@/shared/testing/fake-clock';
 import { dadosValidos, PRAZOS_PADRAO } from './builders/iniciativa.builder';
 import { IniciativaRepositoryEmMemoria } from './in-memory/in-memory-iniciativa.repository';

@@ -1,8 +1,8 @@
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import { IniciativaNaoEncontradaError } from '../../domain/errors/iniciativas.errors';
 import type { Iniciativa } from '../../domain/iniciativa';
 import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
 import type { EventosPort } from '../ports/eventos.port';
-import type { TransacaoPort } from '../ports/transacao.port';
 import type { CarregarComPrazos } from './carregar-com-prazos';
 
 /**

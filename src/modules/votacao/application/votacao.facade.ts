@@ -1,3 +1,4 @@
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import type {
   ParIniciativaCiclo,
   Placar,
@@ -5,7 +6,6 @@ import type {
 } from '../domain/ports/votacao.repository';
 import type { MeuVoto } from '../domain/voto';
 import type { IniciativaPort } from './ports/iniciativa.port';
-import type { TransacaoPort } from './ports/transacao.port';
 import {
   RegistrarVoto,
   type RegistrarVotoInput,
