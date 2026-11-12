@@ -1,10 +1,17 @@
 Identificação:
+
 LLM: ChatGPT
+
 Modelo: GPT-6
+
 Data: 12/11/2026
+
 Framework: Vitest
+
 Linguagem: TypeScript
+
 Versão da suíte: v1
+
 Rodada 1:
 Prompt:
 Histórias de usuário
@@ -14,7 +21,9 @@ US03 - Como aluno/professor ou membro do comitê, gostaria de observar o painel 
 US04 - Como aluno/professor ou membro do comitê, gostaria de observar o calendário de eventos das iniciativas.
 US05 - Como autor, gostaria de editar e ressubmeter uma iniciativa reprovada.
 US06 - Como usuário, gostaria de comentar em uma iniciativa em andamento.
+
 Critérios de aceitação
+
 US01 - Submeter uma iniciativa completa
 US01 - Submeter uma iniciativa com tipo inválido
 US01 - Submeter uma iniciativa sem título
@@ -75,6 +84,7 @@ aqui colocamos o arquivo
 O projeto utiliza:
 TypeScript
 Vitest
+
 Gere uma suíte inicial de testes automatizados (v1) para as histórias de usuário US01 a US06.
 A suíte deve:
 Aplicar técnicas de particionamento de equivalência e análise de valores-limite.
@@ -96,18 +106,17 @@ Problemas observados
 
 
 Execução da suíte v1
-Resultado
-Quantidade
-Testes passaram
+
+Resultado: 
+
+Testes passaram: 62/62
 
 
-Testes falharam
+Testes falharam: 0/62
 
 
-Testes não compilaram
+Testes não compilaram: 0/62
 
-
-Total
 
 
 
