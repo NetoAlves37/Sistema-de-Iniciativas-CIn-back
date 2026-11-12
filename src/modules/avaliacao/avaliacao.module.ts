@@ -2,7 +2,7 @@ import { forwardRef, Module } from '@nestjs/common';
 import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
 import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
 import type { IniciativasPort } from './application/ports/iniciativas.port';
-import { ObterFila } from './application/use-cases/obter-fila';
+import { ObterFila } from './application/queries/obter-fila';
 import { RegistrarDecisao } from './application/use-cases/registrar-decisao';
 import { INICIATIVAS_PORT } from './avaliacao.tokens';
 import { IniciativasFacadeAdapter } from './infrastructure/adapters/iniciativas-facade.adapter';

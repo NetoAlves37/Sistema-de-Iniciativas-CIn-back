@@ -2,8 +2,8 @@ import { ValidacaoError } from '@/shared/domain/domain-error';
 import { DivulgacaoFacade } from './divulgacao.facade';
 import type { AprovadaParaCalendario, ResumoIniciativa } from './dto/divulgacao.dto';
 import type { FiltroAprovadas, FiltroCalendario, IniciativasPort } from './ports/iniciativas.port';
-import { ListarAprovadas } from './use-cases/listar-aprovadas';
-import { ListarOcorrencias } from './use-cases/listar-ocorrencias';
+import { ListarAprovadas } from './queries/listar-aprovadas';
+import { ListarOcorrencias } from './queries/listar-ocorrencias';
 
 class IniciativasEmMemoria implements IniciativasPort {
   aprovadas: ResumoIniciativa[] = [];

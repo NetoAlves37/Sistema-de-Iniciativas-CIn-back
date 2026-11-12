@@ -17,7 +17,7 @@ import { Roles } from '@/common/auth/decorators/roles.decorator';
 import { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto';
 import { PaginationQueryDto } from '@/common/pagination/pagination-query.dto';
 import type { DetalheIniciativa, ItemFila } from '../../application/dto/avaliacao.dto';
-import { ObterFila } from '../../application/use-cases/obter-fila';
+import { ObterFila } from '../../application/queries/obter-fila';
 import { RegistrarDecisao } from '../../application/use-cases/registrar-decisao';
 import { RegistrarDecisaoDto } from './avaliacao.dto';
 

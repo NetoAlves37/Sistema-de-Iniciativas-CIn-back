@@ -1,3 +1,4 @@
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import type {
   ParIniciativaCiclo,
   Placar,
@@ -6,7 +7,6 @@ import type {
 import { wilson } from '../domain/relevancia';
 import type { MeuVoto, ValorVoto } from '../domain/voto';
 import type { EstadoIniciativa, IniciativaPort } from './ports/iniciativa.port';
-import type { TransacaoPort } from './ports/transacao.port';
 import { VotacaoFacade } from './votacao.facade';
 
 const chave = (iniciativaId: string, ciclo: number) => `${iniciativaId}#${ciclo}`;

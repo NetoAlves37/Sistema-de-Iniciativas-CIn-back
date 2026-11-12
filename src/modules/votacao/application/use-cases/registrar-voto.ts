@@ -1,3 +1,4 @@
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
 import {
   IniciativaNaoEncontradaError,
   VotacaoEncerradaError,
@@ -6,7 +7,6 @@ import type { VotacaoRepository } from '../../domain/ports/votacao.repository';
 import { wilson } from '../../domain/relevancia';
 import { type AcaoVoto, decidirVoto, type MeuVoto, validarValorVoto } from '../../domain/voto';
 import type { IniciativaPort } from '../ports/iniciativa.port';
-import type { TransacaoPort } from '../ports/transacao.port';
 
 export interface RegistrarVotoInput {
   iniciativaId: string;

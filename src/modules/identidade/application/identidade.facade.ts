@@ -1,7 +1,7 @@
 import type { Clock } from '@/shared/domain/clock';
 import type { UsuarioRepository } from '../domain/ports/usuario.repository';
 import type { RegistrarUsuarioInput, UsuarioDto } from './dto/usuario.dto';
-import { ObterUsuario, ObterUsuarios } from './use-cases/obter-usuarios';
+import { ObterUsuario, ObterUsuarios } from './queries/obter-usuarios';
 import { RegistrarUsuario } from './use-cases/registrar-usuario';
 
 export type { RegistrarUsuarioInput, UsuarioDto };

@@ -6,9 +6,9 @@ import type {
 import type { ComentarioDto, PaginaDeComentariosDto } from './dto/comentario.dto';
 import type { AutoresPort } from './ports/autores.port';
 import type { IniciativaPort } from './ports/iniciativa.port';
+import { ContarSugestoes } from './queries/contar-sugestoes';
+import { ListarComentarios } from './queries/listar-comentarios';
 import { ComentarIniciativa } from './use-cases/comentar-iniciativa';
-import { ContarSugestoes } from './use-cases/contar-sugestoes';
-import { ListarComentarios } from './use-cases/listar-comentarios';
 
 export type { ComentarioDto, PaginaDeComentariosDto, ParIniciativaCiclo };
 
