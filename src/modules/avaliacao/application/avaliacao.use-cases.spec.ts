@@ -1,7 +1,7 @@
 import { DomainError, ValidacaoError } from '@/shared/domain/domain-error';
 import type { DetalheIniciativa, ResumoIniciativa } from './dto/avaliacao.dto';
 import type { AtorAvaliacao, DecisaoRegistrada, IniciativasPort } from './ports/iniciativas.port';
-import { ObterFila } from './use-cases/obter-fila';
+import { ObterFila } from './queries/obter-fila';
 import { RegistrarDecisao } from './use-cases/registrar-decisao';
 
 const resumo = (id: string, autorId: string, relevancia = 0): ResumoIniciativa => ({

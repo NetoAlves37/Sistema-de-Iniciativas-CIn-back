@@ -4,8 +4,8 @@ import type { CurrentUser } from '@/common/auth/current-user.interface';
 import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
 import { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto';
 import type { OcorrenciaCalendario, ResumoIniciativa } from '../../application/dto/divulgacao.dto';
-import { ListarAprovadas } from '../../application/use-cases/listar-aprovadas';
-import { ListarOcorrencias } from '../../application/use-cases/listar-ocorrencias';
+import { ListarAprovadas } from '../../application/queries/listar-aprovadas';
+import { ListarOcorrencias } from '../../application/queries/listar-ocorrencias';
 import { AprovadasQueryDto, OcorrenciasQueryDto } from './divulgacao.dto';
 
 @ApiTags('Divulgação')

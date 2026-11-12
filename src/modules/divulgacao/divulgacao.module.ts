@@ -3,8 +3,8 @@ import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas
 import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
 import { DivulgacaoFacade } from './application/divulgacao.facade';
 import type { IniciativasPort } from './application/ports/iniciativas.port';
-import { ListarAprovadas } from './application/use-cases/listar-aprovadas';
-import { ListarOcorrencias } from './application/use-cases/listar-ocorrencias';
+import { ListarAprovadas } from './application/queries/listar-aprovadas';
+import { ListarOcorrencias } from './application/queries/listar-ocorrencias';
 import { INICIATIVAS_PORT } from './divulgacao.tokens';
 import { IniciativasFacadeAdapter } from './infrastructure/adapters/iniciativas-facade.adapter';
 import { DivulgacaoController } from './presentation/http/divulgacao.controller';
