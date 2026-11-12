@@ -3,7 +3,7 @@ import {
   dadosDeTeste,
   PRAZOS_PADRAO,
   umaIniciativa,
-} from '@/shared/testing/builders/iniciativa.builder';
+} from '@/modules/iniciativas/testing/builders/iniciativa.builder';
 import { FakeClock } from '@/shared/testing/fake-clock';
 import {
   AutorNaoPodeDecidirError,

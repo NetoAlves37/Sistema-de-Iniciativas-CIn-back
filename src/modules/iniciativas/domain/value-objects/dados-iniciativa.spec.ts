@@ -1,5 +1,5 @@
+import { dadosValidos } from '@/modules/iniciativas/testing/builders/iniciativa.builder';
 import { ValidacaoError } from '@/shared/domain/domain-error';
-import { dadosValidos } from '@/shared/testing/builders/iniciativa.builder';
 import { DadosIniciativa, type DadosIniciativaBrutos, LIMITES } from './dados-iniciativa';
 
 function errosDe(brutos: DadosIniciativaBrutos): Record<string, string> {

@@ -1,12 +1,12 @@
-import { ValidacaoError } from '@/shared/domain/domain-error';
-import type { DomainEvent } from '@/shared/domain/domain-event';
 import {
   dadosValidos,
   PRAZOS_PADRAO,
   umaIniciativa,
-} from '@/shared/testing/builders/iniciativa.builder';
+} from '@/modules/iniciativas/testing/builders/iniciativa.builder';
+import { IniciativaRepositoryEmMemoria } from '@/modules/iniciativas/testing/in-memory/in-memory-iniciativa.repository';
+import { ValidacaoError } from '@/shared/domain/domain-error';
+import type { DomainEvent } from '@/shared/domain/domain-event';
 import { FakeClock } from '@/shared/testing/fake-clock';
-import { IniciativaRepositoryEmMemoria } from '@/shared/testing/in-memory/iniciativa.repository.memoria';
 import {
   AutorNaoPodeDecidirError,
   ConcorrenciaError,
