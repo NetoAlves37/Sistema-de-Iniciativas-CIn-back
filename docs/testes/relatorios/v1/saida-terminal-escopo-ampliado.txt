@@ -1,0 +1,8 @@
+Quatro grupos de arquivos continuam em 0%, e eles são justamente o trabalho da v2:
+
+| Módulo                     | Arquivos em 0%                                                                                                           | História      |
+|----------------------------|--------------------------------------------------------------------------------------------------------------------------|---------------|
+| divulgacao                 | listar-aprovadas, listar-ocorrencias, datas, intervalo, recorrencia, google-agenda-url, periodicidade, divulgacao.facade | US04          |
+| refinamento                | comentar-iniciativa, comentario, listar-comentarios, contar-sugestoes, refinamento.facade, refinamento.errors            | US06          |
+| iniciativas (consultas)    | consultas-iniciativas, iniciativas.facade                                                                                | US03          |
+| iniciativas (casos de uso) | aplicar-prazos-vencidos (25%), editar-iniciativa (40%), ressubmeter-iniciativa (50%)                                     | US05 e prazos |
