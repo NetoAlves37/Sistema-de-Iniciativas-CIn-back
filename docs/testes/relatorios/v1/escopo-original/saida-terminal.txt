@@ -1,0 +1,151 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+  - ESM syntax in a file loaded as CommonJS (vitest.shared.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.12 D:/PROGRAMAÇÃO/Sistema-de-Iniciativas-CIn-back
+      Coverage enabled with v8
+
+ ❯ tests/v1-llm/iniciativas.regras-de-negocio.spec.ts (80 tests | 4 failed) 47ms
+   ✓ US01 - Submissão de Iniciativa (46)
+     ✓ US01 sucesso | Partição de Equivalência (classe válida) | cria com status EM_ANDAMENTO 11ms
+     ✓ US01 tipo válido EXTENSAO | Partição de Equivalência (classe válida) | aceito 2ms
+     ✓ US01 tipo válido PESQUISA | Partição de Equivalência (classe válida) | aceito 0ms
+     ✓ US01 tipo válido EVENTO | Partição de Equivalência (classe válida) | aceito 0ms
+     ✓ US01 tipo inválido "OUTRO" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 tipo inválido "" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 tipo inválido "extensao" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 titulo com 120 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 titulo com 121 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 titulo com 1 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 titulo com 0 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 resumo com 280 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 resumo com 281 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 resumo com 1 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 resumo com 0 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 detalhe com 5000 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 detalhe com 5001 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 detalhe com 1 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 detalhe com 0 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 espaco com 200 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 espaco com 201 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 espaco com 1 caracteres | Valor-Limite | válido 0ms
+     ✓ US01 espaco com 0 caracteres | Valor-Limite | inválido 0ms
+     ✓ US01 título só com espaços | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 data de início com formato inválido "31/12/2030" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 data de início com formato inválido "abc" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 data de início com formato inválido "2030-13-40" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 data de início com formato inválido "" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 término 1 dia antes do início | Valor-Limite (mínimo inválido) | ValidacaoError 0ms
+     ✓ US01 término igual ao início | Valor-Limite (fronteira válida) | aceito 0ms
+     ✓ US01 término 1 dia depois do início | Valor-Limite (primeiro válido) | aceito 0ms
+     ✓ US01 horário fim 09:59 (início 10:00, mesmo dia) | Valor-Limite | inválido 0ms
+     ✓ US01 horário fim 10:00 (início 10:00, mesmo dia) | Valor-Limite | inválido 0ms
+     ✓ US01 horário fim 10:01 (início 10:00, mesmo dia) | Valor-Limite | válido 0ms
+     ✓ US01 horário com formato inválido "25:00" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 horário com formato inválido "10:60" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 horário com formato inválido "dez" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 horário com formato inválido "" | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 periodicidade fora do permitido | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 organizadores vazio | Partição de Equivalência (classe inválida) | ValidacaoError 0ms
+     ✓ US01 participantes = 0 | Valor-Limite | inválido 0ms
+     ✓ US01 participantes = -1 | Valor-Limite | inválido 0ms
+     ✓ US01 participantes = 1 | Valor-Limite | válido 0ms
+     ✓ US01 participantes = 2 | Valor-Limite | válido 0ms
+     ✓ US01 participantes = 1.5 | Valor-Limite | inválido 0ms
+     ✓ US01 dados inválidos | Partição de Equivalência (classe inválida) | nada é gravado 1ms
+   ❯ US02 - Avaliação de Iniciativa (13)
+     ✓ US02 aprovação | Partição de Equivalência (resultado APROVADA) | status APROVADA 1ms
+     ✓ US02 reprovação com justificativa | Partição de Equivalência (REPROVADA válida) | status REPROVADA 0ms
+     × US02 reprovação com justificativa undefined | Partição de Equivalência (classe inválida) | erro 10ms
+     × US02 reprovação com justificativa null | Partição de Equivalência (classe inválida) | erro 1ms
+     × US02 reprovação com justificativa "" | Partição de Equivalência (classe inválida) | erro 1ms
+     × US02 reprovação com justificativa "   " | Partição de Equivalência (classe inválida) | erro 1ms
+     ✓ US02 avaliar iniciativa em EM_ANDAMENTO | Partição de Equivalência (status inválido) | TransicaoInvalidaError 1ms
+     ✓ US02 avaliar iniciativa em EM_VOTACAO | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US02 avaliar iniciativa em APROVADA | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US02 avaliar iniciativa em REPROVADA | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US02 autor avalia a própria iniciativa | Partição de Equivalência (autor) | AutorNaoPodeDecidirError 0ms
+     ✓ US02 permissão de decidir | Partição de Equivalência (perfis) | só comitê não-autor em EM_ANALISE 1ms
+     ✓ US02 pós-avaliação | Partição de Equivalência (estado final) | sai da fila de análise 1ms
+   ✓ US05 - Edição e Ressubmissão (13)
+     ✓ US05 edição pelo autor em EM_ANDAMENTO | Partição de Equivalência (classe válida) | dados atualizados 0ms
+     ✓ US05 edição por não autor | Partição de Equivalência (classe inválida) | SomenteAutorError 0ms
+     ✓ US05 edição em EM_VOTACAO | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 edição em EM_ANALISE | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 edição em APROVADA | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 edição em REPROVADA | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 ressubmissão pelo autor em REPROVADA | Partição de Equivalência | ciclo +1 e EM_ANDAMENTO 0ms
+     ✓ US05 ressubmissão por não autor | Partição de Equivalência (classe inválida) | SomenteAutorError 0ms
+     ✓ US05 ressubmissão em EM_ANDAMENTO | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 ressubmissão em EM_VOTACAO | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 ressubmissão em EM_ANALISE | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 ressubmissão em APROVADA | Partição de Equivalência (status inválido) | TransicaoInvalidaError 0ms
+     ✓ US05 ressubmissão com dados idênticos | Partição de Equivalência (caso limite de dados) | aceita 0ms
+   ✓ US06 - Comentários (permissão por status e prazo de refinamento) (8)
+     ✓ US06 EM_ANDAMENTO com refinamento aberto | Partição de Equivalência (classe válida) | pode comentar 0ms
+     ✓ US06 1 ms antes do fim do refinamento | Valor-Limite (último instante válido) | pode comentar 0ms
+     ✓ US06 exatamente no fim do refinamento | Valor-Limite (fronteira) | não pode comentar 0ms
+     ✓ US06 1 ms após o fim do refinamento | Valor-Limite (primeiro instante inválido+1) | não pode comentar 0ms
+     ✓ US06 status EM_VOTACAO | Partição de Equivalência (status inválido) | não pode comentar 0ms
+     ✓ US06 status EM_ANALISE | Partição de Equivalência (status inválido) | não pode comentar 0ms
+     ✓ US06 status APROVADA | Partição de Equivalência (status inválido) | não pode comentar 0ms
+     ✓ US06 status REPROVADA | Partição de Equivalência (status inválido) | não pode comentar 0ms
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+ FAIL  tests/v1-llm/iniciativas.regras-de-negocio.spec.ts > US02 - Avaliação de Iniciativa > US02 reprovação com justificativa undefined | Partição de Equivalência (classe inválida) | erro
+ FAIL  tests/v1-llm/iniciativas.regras-de-negocio.spec.ts > US02 - Avaliação de Iniciativa > US02 reprovação com justificativa null | Partição de Equivalência (classe inválida) | erro
+ FAIL  tests/v1-llm/iniciativas.regras-de-negocio.spec.ts > US02 - Avaliação de Iniciativa > US02 reprovação com justificativa "" | Partição de Equivalência (classe inválida) | erro
+ FAIL  tests/v1-llm/iniciativas.regras-de-negocio.spec.ts > US02 - Avaliação de Iniciativa > US02 reprovação com justificativa "   " | Partição de Equivalência (classe inválida) | erro
+AssertionError: promise resolved "undefined" instead of rejecting
+
+- Expected:
+Error {
+  "message": "rejected promise",
+}
+
++ Received:
+undefined
+
+ ❯ tests/v1-llm/iniciativas.regras-de-negocio.spec.ts:260:80
+    258|       const { decidir, repositorio } = montar();
+    259|       repositorio.semear(umaIniciativa().comId('i1').doAutor('ana').emAnalise().construir());
+    260|       await expect(decidir.executar('i1', 'carla', 'REPROVADA', justificativa)).rejects.toThrow();
+       |                                                                                ^
+    261|       expect(repositorio.persistida('i1').status).toBe('EM_ANALISE');
+    262|     },
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 76 passed (80)
+   Start at  17:33:17
+   Duration  1.26s (transform 402ms, setup 0ms, import 516ms, tests 47ms, environment 0ms)
+
+ % Coverage report from v8
+-----------------------------|---------|----------|---------|---------|-------------------------
+File                         | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s       
+-----------------------------|---------|----------|---------|---------|-------------------------
+All files                    |    82.9 |     76.4 |   81.81 |   84.69 |                         
+ application/use-cases       |   67.46 |    34.61 |   71.42 |   72.22 |                         
+  alterar-iniciativa.ts      |    90.9 |       50 |     100 |     100 | 23                      
+  aplicar-prazos-vencidos.ts |   22.22 |        0 |   33.33 |      25 | 23-36                   
+  carregar-com-prazos.ts     |   78.26 |       30 |     100 |   88.88 | 42-43                   
+  decidir-iniciativa.ts      |   88.88 |       75 |     100 |     100 | 28                      
+  editar-iniciativa.ts       |      40 |        0 |   33.33 |      40 | 14-16                   
+  ressubmeter-iniciativa.ts  |      50 |        0 |   33.33 |      50 | 16-18                   
+  submeter-iniciativa.ts     |     100 |      100 |     100 |     100 |                         
+ domain                      |   89.32 |    80.95 |   90.32 |   88.88 |                         
+  iniciativa.ts              |   89.47 |    80.95 |   93.33 |   89.01 | 168,210,246-252,267,274 
+  status.ts                  |      75 |      100 |       0 |      75 | 20                      
+  tipos.ts                   |     100 |      100 |     100 |     100 |                         
+ domain/errors               |   69.56 |    77.77 |   66.66 |   69.56 |                         
+  iniciativas.errors.ts      |   69.56 |    77.77 |   66.66 |   69.56 | 5-9,66-77               
+ domain/events               |     100 |      100 |     100 |     100 |                         
+  iniciativa.events.ts       |     100 |      100 |     100 |     100 |                         
+ domain/ports                |     100 |      100 |     100 |     100 |                         
+  iniciativa.repository.ts   |       0 |        0 |       0 |       0 |                         
+  prazos-config.ts           |     100 |      100 |     100 |     100 |                         
+ domain/value-objects        |    91.3 |    86.25 |      80 |   93.58 |                         
+  dados-iniciativa.ts        |    91.3 |    86.25 |      80 |   93.58 | 108,130,134,140,164     
+-----------------------------|---------|----------|---------|---------|-------------------------
