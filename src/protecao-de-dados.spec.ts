@@ -101,7 +101,9 @@ describe('Proteção de dados: migrations', () => {
     expect(acusa('ALTER TABLE "x" DROP COLUMN "y";')).toEqual(['DROP COLUMN']);
     expect(acusa('truncate "x";')).toEqual(['TRUNCATE']);
     expect(acusa('-- DELETE FROM "x"\n/* DROP TABLE "y" */ SELECT 1;')).toEqual([]);
-    expect(acusa('ALTER TABLE "x" DROP CONSTRAINT "c"; ALTER TABLE "x" ALTER COLUMN "a" DROP DEFAULT;')).toEqual([]);
+    expect(
+      acusa('ALTER TABLE "x" DROP CONSTRAINT "c"; ALTER TABLE "x" ALTER COLUMN "a" DROP DEFAULT;'),
+    ).toEqual([]);
   });
 });
 

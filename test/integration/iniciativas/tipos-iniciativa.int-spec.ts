@@ -58,7 +58,12 @@ describe('Integração: tipos de iniciativa', () => {
     const criado = await criarTipo();
 
     const linha = await t.prisma.tipoIniciativa.findUniqueOrThrow({ where: { id: criado.id } });
-    expect(linha).toMatchObject({ code: criado.code, label: criado.nome, cor: '#336699', ativo: true });
+    expect(linha).toMatchObject({
+      code: criado.code,
+      label: criado.nome,
+      cor: '#336699',
+      ativo: true,
+    });
 
     const log = await logDe(criado.code);
     expect(log).toHaveLength(1);

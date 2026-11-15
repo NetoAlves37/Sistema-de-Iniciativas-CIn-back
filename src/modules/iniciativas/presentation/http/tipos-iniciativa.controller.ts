@@ -54,7 +54,10 @@ export class TiposIniciativaController {
 
   @Get()
   @ApiOperation({ summary: 'Listar os tipos (ativos e inativos, ou só os ativos)' })
-  @ApiResponse({ status: 200, description: 'Tipos em ordem alfabética, com a contagem de iniciativas' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tipos em ordem alfabética, com a contagem de iniciativas',
+  })
   listar(@Query() query: ListarTiposQueryDto) {
     return this.listarTipos.executar({ somenteAtivos: query.ativos });
   }

@@ -56,7 +56,9 @@ describe('Cadastro de tipos de iniciativa', () => {
 
     it('nome repetido (sem diferenciar acento e maiúsculas) recebe 422 no campo nome', async () => {
       const { cadastrarTipo, tipos } = montar();
-      const erro = await erroDe(cadastrarTipo.executar(admin, { nome: 'extensao', cor: '#000000' }));
+      const erro = await erroDe(
+        cadastrarTipo.executar(admin, { nome: 'extensao', cor: '#000000' }),
+      );
       expect(erro).toBeInstanceOf(ValidacaoError);
       expect((erro as ValidacaoError).campos).toEqual({ nome: 'Já existe um tipo com este nome.' });
       expect(tipos.log).toHaveLength(0);
@@ -102,7 +104,12 @@ describe('Cadastro de tipos de iniciativa', () => {
         cor: '#ff0000',
       });
 
-      expect(alterado).toMatchObject({ code: 'EVENTO', nome: 'Festival', cor: '#FF0000', iniciativas: 3 });
+      expect(alterado).toMatchObject({
+        code: 'EVENTO',
+        nome: 'Festival',
+        cor: '#FF0000',
+        iniciativas: 3,
+      });
       expect(tipos.log.at(-1)).toMatchObject({
         acao: 'ALTERADO',
         por: 'admin',
@@ -136,7 +143,10 @@ describe('Cadastro de tipos de iniciativa', () => {
       await alterarTipo.executar(extensao.id, admin, { nome: 'Extensão', cor: '#9be0a0' });
       expect(tipos.log).toHaveLength(0);
 
-      await alterarTipo.executar(extensao.id, admin, { nome: 'Extensão Universitária', ativo: false });
+      await alterarTipo.executar(extensao.id, admin, {
+        nome: 'Extensão Universitária',
+        ativo: false,
+      });
       expect(tipos.log.map((l) => l.acao)).toEqual(['ALTERADO', 'DESATIVADO']);
     });
 

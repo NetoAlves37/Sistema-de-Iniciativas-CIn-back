@@ -39,7 +39,10 @@ describe('TipoDeIniciativa', () => {
 
   describe('criar', () => {
     it('nasce ativo, com nome aparado, cor em maiúsculas e o registro CRIADO pendente', () => {
-      const tipo = TipoDeIniciativa.criar({ nome: '  Festival   de Música ', cor: '#ff00aa' }, nenhum);
+      const tipo = TipoDeIniciativa.criar(
+        { nome: '  Festival   de Música ', cor: '#ff00aa' },
+        nenhum,
+      );
 
       expect(tipo).toMatchObject({
         code: 'FESTIVAL_DE_MUSICA',
@@ -68,16 +71,24 @@ describe('TipoDeIniciativa', () => {
     it.each([
       [{}, { nome: 'Informe o nome do tipo.', cor: 'Escolha a cor do tipo.' }],
       [{ nome: '   ', cor: '#000000' }, { nome: 'Informe o nome do tipo.' }],
-      [{ nome: 'x'.repeat(61), cor: '#000000' }, { nome: 'O nome deve ter no máximo 60 caracteres.' }],
+      [
+        { nome: 'x'.repeat(61), cor: '#000000' },
+        { nome: 'O nome deve ter no máximo 60 caracteres.' },
+      ],
       [{ nome: 'Liga', cor: '#12345' }, { cor: 'Informe a cor no formato #RRGGBB.' }],
       [{ nome: 'Liga', cor: 'red' }, { cor: 'Informe a cor no formato #RRGGBB.' }],
-      [{ nome: 42, cor: 7 }, { nome: 'Informe o nome do tipo.', cor: 'Escolha a cor do tipo.' }],
+      [
+        { nome: 42, cor: 7 },
+        { nome: 'Informe o nome do tipo.', cor: 'Escolha a cor do tipo.' },
+      ],
     ])('valida %j', (campos, erros) => {
       expect(camposComErro(() => TipoDeIniciativa.criar(campos, nenhum))).toEqual(erros);
     });
 
     it('aceita exatamente 60 caracteres', () => {
-      expect(TipoDeIniciativa.criar({ nome: 'x'.repeat(60), cor: '#000000' }, nenhum).nome).toHaveLength(60);
+      expect(
+        TipoDeIniciativa.criar({ nome: 'x'.repeat(60), cor: '#000000' }, nenhum).nome,
+      ).toHaveLength(60);
     });
   });
 

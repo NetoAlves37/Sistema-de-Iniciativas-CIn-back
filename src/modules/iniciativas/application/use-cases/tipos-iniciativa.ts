@@ -70,7 +70,14 @@ export class CadastrarTipo {
     const id = await this.transacao.run(() =>
       this.tipos.criar(tipo, { id: ator.id, nome: ator.nome }, this.clock.now()),
     );
-    return { id, code: tipo.code, nome: tipo.nome, cor: tipo.cor, ativo: tipo.ativo, iniciativas: 0 };
+    return {
+      id,
+      code: tipo.code,
+      nome: tipo.nome,
+      cor: tipo.cor,
+      ativo: tipo.ativo,
+      iniciativas: 0,
+    };
   }
 }
 

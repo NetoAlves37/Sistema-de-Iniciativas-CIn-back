@@ -491,21 +491,21 @@ describe('Iniciativa: alteração de datas (comitê ou ADMIN, só aprovadas)', (
 
   it('quem não é do comitê recebe 403, mesmo sendo o autor', () => {
     const iniciativa = umaIniciativa().doAutor('ana').aprovada().construir();
-    expect(() =>
-      iniciativa.alterarDatas(novas, { id: 'ana', ehComite: false }, clockEm()),
-    ).toThrow(SomenteComiteError);
+    expect(() => iniciativa.alterarDatas(novas, { id: 'ana', ehComite: false }, clockEm())).toThrow(
+      SomenteComiteError,
+    );
   });
 
-  it.each(['EM_ANDAMENTO', 'EM_VOTACAO', 'EM_ANALISE', 'REPROVADA'] as const)(
-    'em %s recebe 409',
-    (status) => {
-      const iniciativa = umaIniciativa().noStatus(status).construir();
-      expect(() => iniciativa.alterarDatas(novas, comite, clockEm())).toThrow(
-        TransicaoInvalidaError,
-      );
-      expect(iniciativa.novasTransicoes()).toEqual([]);
-    },
-  );
+  it.each([
+    'EM_ANDAMENTO',
+    'EM_VOTACAO',
+    'EM_ANALISE',
+    'REPROVADA',
+  ] as const)('em %s recebe 409', (status) => {
+    const iniciativa = umaIniciativa().noStatus(status).construir();
+    expect(() => iniciativa.alterarDatas(novas, comite, clockEm())).toThrow(TransicaoInvalidaError);
+    expect(iniciativa.novasTransicoes()).toEqual([]);
+  });
 
   it('datas inválidas não mudam nada', () => {
     const iniciativa = umaIniciativa().aprovada().construir();

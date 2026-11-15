@@ -21,7 +21,13 @@ try {
 /** Bancos que os testes recriam a cada execução: o reset é livre neles. */
 const BANCO_DESCARTAVEL = /-(TEST|SMOKE)$/i;
 /** Hosts de um Postgres na própria máquina (ou no docker compose de desenvolvimento). */
-export const HOSTS_LOCAIS = new Set(['localhost', '127.0.0.1', '::1', 'postgres', 'host.docker.internal']);
+export const HOSTS_LOCAIS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  'postgres',
+  'host.docker.internal',
+]);
 
 export function databaseUrl(database) {
   const user = encodeURIComponent(process.env.DB_USERNAME ?? 'postgres');
@@ -102,7 +108,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     );
     process.exit(1);
   }
-  const confirmacao = args.find((arg) => arg.startsWith('--confirmar='))?.slice('--confirmar='.length);
+  const confirmacao = args
+    .find((arg) => arg.startsWith('--confirmar='))
+    ?.slice('--confirmar='.length);
   try {
     await prepareDatabase(database, { reset: args.includes('--reset'), confirmacao });
   } catch (error) {

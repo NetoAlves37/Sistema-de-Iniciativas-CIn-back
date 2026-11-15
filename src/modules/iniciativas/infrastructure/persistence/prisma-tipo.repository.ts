@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, type TipoIniciativa as LinhaTipo } from '@prisma/client';
+import { type TipoIniciativa as LinhaTipo, Prisma } from '@prisma/client';
 import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
 import { TipoEmUsoError } from '../../domain/errors/iniciativas.errors';
 import type { AutorRegistro, TipoRepository } from '../../domain/ports/tipo.repository';
