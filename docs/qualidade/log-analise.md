@@ -21,7 +21,7 @@ aqui, com o motivo.
 | Ferramenta: Biome 2.4.16 | Feita em 15/11/2026 | 32 | (preencher na triagem) | (preencher) |
 | Ferramenta: jscpd 4.3.0 (duplicação) | Feita em 15/11/2026 | 7 clones | (preencher) | (preencher) |
 | Ferramenta: madge 8.0.0 (dependências) | Feita em 15/11/2026 | 3 ciclos | (preencher) | (preencher) |
-| LLM | Rodadas 1 a 7 abaixo (a fazer) | — | — | — |
+| LLM: Claude Opus 5.5 | Feita em 15/11/2026, 7 rodadas | 159 | (preencher na triagem) | 1 falso positivo já confirmado (R2 #11) |
 | Leitura manual | Roteiro abaixo (a fazer) | — | — | — |
 
 ---
@@ -110,12 +110,15 @@ e módulos e pode ser citado como evidência do que já é verificado automatica
 
 ## 2. LLM
 
-### 2.1 Identificação (preencher antes da primeira rodada)
+### 2.1 Identificação
 
-- **LLM e modelo:** (ex.: Claude Opus 5.5, ChatGPT GPT-5, Gemini 3 Pro)
-- **Interface:** (ex.: claude.ai, chatgpt.com, Copilot no VS Code)
-- **Data de uso:**
-- **Conversa:** use uma conversa nova para cada rodada, para que a LLM não misture os módulos.
+- **LLM e modelo:** Claude Opus 5.5 (`claude-opus-5-5`, Anthropic)
+- **Interface:** Claude Code (extensão do VS Code). Cada rodada rodou num agente separado, que
+  recebeu só o prompt e o arquivo de contexto do módulo, sem acesso ao resto do repositório,
+  sem rodar comandos e sem ver as outras rodadas, a saída das ferramentas ou os candidatos da
+  parte 1. É o equivalente a uma conversa nova por rodada.
+- **Data de uso:** 15/11/2026, com as 7 rodadas em paralelo, entre 16h40 e 16h50.
+- **Rodadas de acompanhamento:** nenhuma. As respostas foram salvas sem edição.
 
 ### 2.2 Protocolo
 
@@ -219,19 +222,82 @@ Formato: uma tabela com as colunas
 <cole aqui o conteúdo integral de llm/contexto/entre-modulos.txt>
 ```
 
-### 2.5 Registro de cada rodada (copiar o bloco para as rodadas 1 a 7)
+### 2.5 Registro das rodadas
 
-#### Rodada 1: iniciativas
+Em todas as rodadas: prompt da seção 2.3 (ou o da rodada 7) seguido do arquivo de contexto do
+módulo, data 15/11/2026 e resposta salva integralmente em `llm/respostas/`.
 
-- **Data e hora:**
-- **Prompt:** prompt base da seção 2.3 com `<MÓDULO>` = `iniciativas` + `llm/contexto/iniciativas.txt`
-- **Resposta completa:** `llm/respostas/rodada-1-iniciativas.md`
-- **Resumo da resposta:** (quantos achados e de quais categorias)
-- **Problemas observados na resposta:** (trechos inventados, achados genéricos, repetições)
+| Rodada | Módulo | Achados | Por categoria principal (propriedade / SOLID / smell) | Confiança (alta / média / baixa) |
+|---|---|---|---|---|
+| 1 | iniciativas | 39 | 11 / 5 / 23 | 21 / 16 / 2 |
+| 2 | avaliacao | 18 | 8 / 3 / 7 | 3 / 9 / 6 |
+| 3 | refinamento | 22 | 8 / 3 / 11 | 6 / 10 / 6 |
+| 4 | votacao | 22 | 8 / 4 / 10 | 7 / 10 / 5 |
+| 5 | divulgacao | 21 | 5 / 4 / 12 | 4 / 12 / 5 |
+| 6 | identidade | 17 | 11 / 1 / 5 | 4 / 7 / 6 |
+| 7 | entre módulos | 20 | 18 / 2 / 0 | 9 / 9 / 2 |
+| **Total** | | **159** | **69 / 22 / 68** | **54 / 73 / 32** |
 
-| # da LLM | Achado (resumo) | Decisão | Motivo | Quem confirmou | Vira |
+As contagens por categoria seguem a primeira categoria citada em cada linha (muitos achados
+citam mais de uma).
+
+#### Conferência dos trechos citados (alucinação)
+
+Todo achado precisava trazer o trecho exato do código. Um script comparou cada trecho entre
+crases com o arquivo de contexto daquela rodada:
+
+| | Achados |
+|---|---|
+| Todos os trechos encontrados literalmente | 127 |
+| Parte dos trechos encontrados | 29 |
+| Nenhum trecho encontrado literalmente | 3 |
+| Sem trecho | 0 |
+
+Os 29 parciais são abreviações (a LLM cortou o trecho com `...`, juntou várias linhas numa só
+ou pôs crases dentro de comentários). Os 3 sem correspondência (R1 #37, R3 #10 e R6 #6) foram
+conferidos à mão: os trechos existem, só que quebrados em várias linhas no código.
+**Nenhum trecho inventado foi encontrado.**
+
+#### Problemas observados nas respostas
+
+- **Falso positivo por falta de contexto (R2 #11):** a LLM afirma que o `forwardRef` de
+  `avaliacao.module.ts` indica dependência circular entre `avaliacao` e `iniciativas`. Não
+  indica: `iniciativas` não importa nada de `avaliacao`, e o madge não encontrou esse ciclo. A
+  LLM deduziu o ciclo do `forwardRef` porque não via o outro módulo.
+- **Duplicação entre módulos não detectada (R1):** a `PERIODICIDADES` está declarada igual em
+  `iniciativas/domain/tipos.ts` e em `divulgacao/domain/periodicidade.ts`. Na rodada 1 a LLM
+  elogiou a constante como "boa fonte única", e na rodada 5 não a citou. Como cada rodada vê um
+  módulo só, a duplicação entre módulos fica invisível. Na rodada 5 ela encontrou um caso
+  parecido, o `FORMATO_CODIGO_TIPO` copiado de iniciativas (R5 #3), porque um comentário do
+  próprio código avisava.
+- **Mesmo achado em várias rodadas:** o ciclo entre módulos aparece em R1 #2, R2 #11, R3 #15,
+  R4 #18, R5 #1 e R7 #1 e #2. A fachada que instancia os próprios casos de uso aparece em
+  R3 #8, R4 #13, R6 #4 e R7 #11. Na consolidação, cada um conta uma vez.
+- **Decisões de projeto conscientes apontadas como problema:** o ciclo entre módulos (ADR-013)
+  e a leitura de `votacao_placar` na listagem (R1 #3, ADR-002). A LLM marcou alguns como
+  possivelmente intencionais, mas não sabia das ADRs.
+- **Achados de baixa relevância:** nomes de tokens (R3 #21), mistura de verbo e substantivo nos
+  nomes de métodos (R7 #20), TTL repetido num comentário (R6 #3). São reais, mas atrapalham pouco.
+
+#### Coincidências com as ferramentas e com a parte 1
+
+| Problema | Biome | jscpd | madge | LLM | Parte 1 / manual |
 |---|---|---|---|---|---|
-| | | aceito / descartado | | | DT-xx / — |
+| `DadosIniciativa.criar` longo e com 13 parâmetros | sim | — | — | R1 #15, #16 | — |
+| Bloco repetido em `editar-iniciativa.ts` e `ressubmeter-iniciativa.ts` | — | clone 4 | — | R1 #11 | — |
+| Adaptador `iniciativa.adapter.ts` igual em refinamento e votacao | — | clone 1 | — | R7 #6 (o conceito `ParIniciativaCiclo`) | — |
+| Limites do domínio repetidos como números nos DTOs | números mágicos | — | — | R1 #22, R2 #5, R3 #2, R5 #11 | — |
+| Ciclo entre módulos | — | — | 3 ciclos | R1 #2, R5 #1, R7 #1, #2 e outros | ADR-013 |
+| Regra "reprovar exige justificativa" fora da entidade | — | — | — | R1 #31, R7 #16 | candidato da parte 1 |
+| Listagem lê a tabela de votacao | — | — | — | R1 #3 | ADR-002 |
+| `PERIODICIDADES` duplicada | — | não pegou (1 linha) | — | não pegou | candidato da parte 1 |
+| Guard com efeito colateral e dependência da ordem de import | — | — | — | R6 #12, #13 e R7 #19 | — |
+| Fachada de iniciativas atende dois tipos de cliente | — | — | — | R1 #1, R7 #8 | — |
+
+#### Triagem
+
+A triagem de cada achado (aceito ou descartado, com o motivo e quem confirmou lendo o código)
+é feita pela equipe. A seção 4 traz uma sugestão de consolidação para orientar a escolha.
 
 ---
 
@@ -271,3 +337,30 @@ Depois das três formas, juntar os achados confirmados (cerca de 8, cobrindo pro
 projeto, SOLID e smells sempre que possível) em `divida-tecnica.md`, com a coluna "Como foi
 encontrado" indicando manual, Biome, jscpd, madge ou LLM (ou mais de uma). Essa coluna é a base
 da comparação na reflexão final.
+
+### 4.1 Sugestão de consolidação (a equipe confirma lendo o código)
+
+Escolhidos pelos critérios do documento: impacto concreto, cobertura dos três grupos e, para
+os candidatos a refatoração, trecho já coberto pela suíte v2.
+
+| Sugestão | Local | Problema | Categoria | Fontes | Refatorar? |
+|---|---|---|---|---|---|
+| DT-01 | `divulgacao/domain/periodicidade.ts` e `iniciativas/domain/tipos.ts` | `PERIODICIDADES` declarada igual nos dois módulos; `periodicidade.ts` também guarda `TipoIniciativa` e uma cópia de `FORMATO_CODIGO_TIPO` | Duplicated Code; integridade conceitual; coesão | Manual (parte 1); LLM R5 #3 e #4 | **Sim**: pequeno e coberto pela v2 (US01 periodicidade e US04 recorrência) |
+| DT-02 | `iniciativas/domain/value-objects/dados-iniciativa.ts`, `DadosIniciativa.criar` | Método de 84 linhas, complexidade 42, valida 13 campos em sequência; construtor com 13 parâmetros | Long Method; Long Parameter List; SRP | Biome; LLM R1 #15 e #16 | **Sim**: o trecho mais testado da v2 (todos os limites da US01). A assinatura de `criar` fica igual, porque a v1 a usa |
+| DT-03 | DTOs de `iniciativas`, `avaliacao`, `refinamento` e `divulgacao` | Limites do domínio (120, 280, 1000, 2000, 62 dias...) repetidos como números nos schemas e textos | Magic Numbers; Duplicated Code | Biome; LLM R1 #22, R2 #5, R3 #2, R5 #11 | **Sim**: Replace Magic Literal, sem mudar comportamento |
+| DT-04 | `editar-iniciativa.ts` e `ressubmeter-iniciativa.ts` | Mesmo bloco nos dois casos de uso | Duplicated Code | jscpd; LLM R1 #11 | Opcional (coberto pela lacuna L10 da v2) |
+| DT-05 | `iniciativas/domain/iniciativa.ts` `decidir()` e `avaliacao/domain/decisao.ts` | A regra "reprovar exige justificativa" fica fora da entidade que ela protege | Information hiding; coesão | Manual (parte 1); LLM R1 #31, R7 #16 | Não: corrigir acrescenta regra ao domínio (muda comportamento) |
+| DT-06 | `iniciativas.module.ts` × `divulgacao`, `refinamento`, `votacao` | Três dependências circulares entre módulos; a com divulgacao existe só por uma função pura (`googleAgendaUrl`) | Acoplamento; DIP | madge; LLM R1 #2, R5 #1, R7 #1 e #2; ADR-013 | Não: trabalho grande e decisão registrada |
+| DT-07 | `iniciativas/application/iniciativas.facade.ts` | A mesma fachada atende os outros módulos e os controllers do próprio módulo | ISP; information hiding | LLM R1 #1, R7 #8 | Não |
+| DT-08 | `identidade/presentation/http/usuario-sync.guard.ts` e `identidade.module.ts` | Guard com efeito colateral (grava usuário) e que depende da ordem de import em outro arquivo | Integridade conceitual; acoplamento; SRP | LLM R6 #12, #13 e R7 #19 | Não |
+
+Cobertura dos três grupos: propriedades de projeto (DT-01, DT-05, DT-06, DT-07, DT-08), SOLID
+(DT-02 SRP, DT-06 DIP, DT-07 ISP, DT-08 SRP) e code smells (DT-01, DT-02, DT-03, DT-04).
+
+As três refatorações sugeridas são de categorias diferentes (duplicação e integridade
+conceitual; método longo e SRP; números mágicos) e tocam código coberto pela v2.
+
+**Descartes já registrados:** R2 #11 (ciclo `avaliacao` × `iniciativas` que não existe); as 4
+fábricas `useFactory` do `iniciativas.module.ts` apontadas pelo Biome (`useMaxParams`), porque
+receber muitas dependências é próprio da injeção de dependência do Nest; os clones 3 e 6 do jscpd
+(cabeçalhos de controller), a confirmar.
