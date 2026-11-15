@@ -1,8 +1,8 @@
 import { ValidacaoError } from '@/shared/domain/domain-error';
 import {
+  FORMATO_CODIGO_TIPO,
   PERIODICIDADES,
   type Periodicidade,
-  TIPOS_INICIATIVA,
   type TipoIniciativa,
 } from '../tipos';
 
@@ -22,6 +22,12 @@ export interface DadosIniciativaBrutos {
   membros?: unknown;
   participantes?: unknown;
 }
+
+/** Só as datas e os horários (alteração de datas de uma aprovada). */
+export type DatasIniciativaBrutas = Pick<
+  DadosIniciativaBrutos,
+  'inicio' | 'fim' | 'horaInicio' | 'horaFim'
+>;
 
 export const LIMITES = {
   titulo: 120,
@@ -71,11 +77,21 @@ export class DadosIniciativa {
     readonly participantes: number,
   ) {}
 
-  static criar(brutos: DadosIniciativaBrutos): DadosIniciativa {
+  /**
+   * `tiposPermitidos`: códigos dos tipos que podem ser escolhidos (os ativos do cadastro, e o
+   * tipo atual da iniciativa na edição). O caso de uso sempre informa; sem ele, só o formato
+   * do código é conferido (usado ao revalidar dados que já foram aceitos, como em `comDatas`).
+   */
+  static criar(
+    brutos: DadosIniciativaBrutos,
+    tiposPermitidos?: ReadonlySet<string>,
+  ): DadosIniciativa {
     const erros: Record<string, string> = {};
 
     const tipo = texto(brutos.tipo);
-    if (!(TIPOS_INICIATIVA as readonly string[]).includes(tipo)) erros.tipo = 'Selecione o tipo.';
+    if (!tipo || !FORMATO_CODIGO_TIPO.test(tipo)) erros.tipo = 'Selecione o tipo.';
+    else if (tiposPermitidos && !tiposPermitidos.has(tipo))
+      erros.tipo = 'Este tipo não existe ou foi desativado. Selecione outro.';
 
     const titulo = texto(brutos.titulo);
     if (!titulo) erros.titulo = 'Informe o título.';
@@ -158,6 +174,28 @@ export class DadosIniciativa {
       membros || null,
       participantes,
     );
+  }
+
+  /**
+   * Cópia com novas datas e horários (os demais campos ficam como estão). Revalida com as
+   * mesmas regras de `criar` (RN-02), então só os erros de data e hora podem aparecer.
+   */
+  comDatas(datas: DatasIniciativaBrutas): DadosIniciativa {
+    return DadosIniciativa.criar({
+      tipo: this.tipo,
+      titulo: this.titulo,
+      resumo: this.resumo,
+      detalhe: this.detalhe,
+      periodicidade: this.periodicidade,
+      espaco: this.espaco,
+      organizadores: this.organizadores,
+      membros: this.membros,
+      participantes: this.participantes,
+      inicio: datas.inicio,
+      fim: datas.fim,
+      horaInicio: datas.horaInicio,
+      horaFim: datas.horaFim,
+    });
   }
 
   get temHorario(): boolean {

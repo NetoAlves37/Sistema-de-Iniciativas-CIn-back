@@ -425,6 +425,77 @@ describe('E2E: fluxos de iniciativas', () => {
     });
   });
 
+  describe('alteração de datas de uma aprovada (comitê ou ADMIN)', () => {
+    async function aprovada() {
+      const dela = await submeter('ana', { comVotacao: false });
+      await levarParaAnalise(dela.id, false);
+      const decisao = await (await t.req('carla'))
+        .post(`/avaliacao/${dela.id}/decisao`)
+        .send({ resultado: 'APROVADA' });
+      expect(decisao.status).toBe(200);
+      return dela;
+    }
+
+    const novasDatas = {
+      inicio: '2026-12-08',
+      fim: '2026-12-09',
+      horaInicio: '14:00',
+      horaFim: '16:00',
+    };
+
+    it('o ADMIN altera, o calendário passa a mostrar as novas ocorrências e o histórico registra', async () => {
+      const dela = await aprovada();
+
+      const resposta = await (await t.req('admin'))
+        .patch(`/iniciativas/${dela.id}/datas`)
+        .send(novasDatas);
+      expect(resposta.status).toBe(200);
+      expect(resposta.body.data).toMatchObject({ ...novasDatas, status: 'APROVADA' });
+
+      const calendario = await (await t.req('diego')).get(
+        '/divulgacao/ocorrencias?de=2026-12-01&ate=2026-12-31',
+      );
+      const delas = calendario.body.data.filter(
+        (o: { iniciativaId: string }) => o.iniciativaId === dela.id,
+      );
+      expect(delas.map((o: { inicio: string }) => o.inicio.slice(0, 10))).toEqual([
+        '2026-12-08',
+        '2026-12-09',
+      ]);
+
+      const historico = await (await t.req('ana')).get(`/iniciativas/${dela.id}/historico`);
+      expect(historico.body.data[0]).toMatchObject({ de: 'APROVADA', para: 'APROVADA' });
+      expect(historico.body.data[0].nota).toContain('para 08/12/2026 a 09/12/2026, 14:00–16:00');
+    });
+
+    it('o comitê também altera; o autor sem papel de comitê recebe 403', async () => {
+      const dela = await aprovada();
+      const doAutor = await (await t.req('ana'))
+        .patch(`/iniciativas/${dela.id}/datas`)
+        .send(novasDatas);
+      expect(doAutor.status).toBe(403);
+      const doComite = await (await t.req('elisa'))
+        .patch(`/iniciativas/${dela.id}/datas`)
+        .send(novasDatas);
+      expect(doComite.status).toBe(200);
+    });
+
+    it('fora de Aprovada recebe 409 e datas inválidas recebem 422 por campo', async () => {
+      const emAndamento = await submeter('ana');
+      const cedo = await (await t.req('admin'))
+        .patch(`/iniciativas/${emAndamento.id}/datas`)
+        .send(novasDatas);
+      expect(cedo.status).toBe(409);
+
+      const dela = await aprovada();
+      const invalida = await (await t.req('admin'))
+        .patch(`/iniciativas/${dela.id}/datas`)
+        .send({ ...novasDatas, fim: '2026-12-01' });
+      expect(invalida.status).toBe(422);
+      expect(invalida.body.errors).toHaveProperty('fim');
+    });
+  });
+
   describe('edição (RN-04)', () => {
     it('o autor edita em Em andamento, inclusive comVotacao, e o histórico registra a edição', async () => {
       const dela = await submeter('ana');

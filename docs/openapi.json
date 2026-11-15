@@ -487,6 +487,58 @@
         ]
       }
     },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/datas": {
+      "patch": {
+        "description": "Muda início, término e horários da iniciativa; todas as ocorrências do calendário são recalculadas. A periodicidade não muda.",
+        "operationId": "IniciativasController_alterarDatas_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasIniciativaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detalhe atualizado"
+          },
+          "403": {
+            "description": "Só o comitê ou o ADMIN"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          },
+          "409": {
+            "description": "Só iniciativas aprovadas"
+          },
+          "422": {
+            "description": "Datas ou horários inválidos, com `errors` por campo"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alterar datas e horários de uma aprovada (comitê ou ADMIN)",
+        "tags": [
+          "Iniciativas"
+        ]
+      }
+    },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/ressubmissao": {
       "post": {
         "operationId": "IniciativasController_ressubmeter_v1",
@@ -1154,6 +1206,29 @@
           "comVotacao": {
             "description": "Enviar para votação geral (padrão: true)",
             "type": "boolean"
+          }
+        }
+      },
+      "DatasIniciativaDto": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "description": "Data de início (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "fim": {
+            "description": "Data de término (YYYY-MM-DD), igual ou posterior ao início",
+            "type": "string"
+          },
+          "horaInicio": {
+            "description": "Hora de início (HH:mm), junto com horaFim; null para dia inteiro",
+            "type": "string",
+            "nullable": true
+          },
+          "horaFim": {
+            "description": "Hora de término (HH:mm), posterior ao início; null para dia inteiro",
+            "type": "string",
+            "nullable": true
           }
         }
       },

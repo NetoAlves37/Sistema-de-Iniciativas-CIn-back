@@ -42,13 +42,59 @@ model Usuario {
 }
 
 /// owner: iniciativas
+/// Cadastro mantido pelo comitê e pelo ADMIN (tela "Tipos de iniciativa"). `code` é gerado do
+/// nome na criação e não muda mais; `label` é o nome exibido e pode ser renomeado.
 model TipoIniciativa {
-  id          Int          @id @default(autoincrement())
-  code        String       @unique
-  label       String
-  iniciativas Iniciativa[]
+  id           Int                 @id @default(autoincrement())
+  code         String              @unique @db.VarChar(40)
+  label        String              @db.VarChar(60)
+  /// `#RRGGBB`. A cor do texto (preto ou branco) é calculada pelo front a partir dela.
+  cor          String              @db.VarChar(7)
+  /// Inativo: some da seleção de novas iniciativas, mas as antigas continuam com ele.
+  ativo        Boolean             @default(true)
+  criadoEm     DateTime            @default(now()) @map("criado_em") @db.Timestamptz(3)
+  atualizadoEm DateTime            @updatedAt @map("atualizado_em") @db.Timestamptz(3)
+  iniciativas  Iniciativa[]
+  log          TipoIniciativaLog[]
 
   @@map("iniciativas_tipos")
+}
+
+/// owner: iniciativas
+/// Ações registradas no log do cadastro de tipos (lookup).
+model AcaoTipoIniciativa {
+  id    Int                 @id @default(autoincrement())
+  code  String              @unique
+  label String
+  log   TipoIniciativaLog[]
+
+  @@map("iniciativas_tipos_acoes")
+}
+
+/// owner: iniciativas
+/// Log de auditoria do cadastro de tipos: quem fez, quando e o quê (antes e depois).
+/// Guarda `tipoCode` e `tipoLabel` para continuar legível depois que o tipo é excluído.
+model TipoIniciativaLog {
+  id        String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// Ordem de gravação: desempata registros com o mesmo `ocorreuEm`.
+  seq       BigInt             @default(autoincrement())
+  tipoId    Int?               @map("tipo_id")
+  tipo      TipoIniciativa?    @relation(fields: [tipoId], references: [id], onDelete: SetNull)
+  tipoCode  String             @map("tipo_code") @db.VarChar(40)
+  tipoLabel String             @map("tipo_label") @db.VarChar(60)
+  acaoId    Int                @map("acao_id")
+  acao      AcaoTipoIniciativa @relation(fields: [acaoId], references: [id])
+  /// Id do usuário (o `sub` do Keycloak) e o nome dele no momento da ação.
+  por       String
+  porNome   String             @map("por_nome")
+  /// Campos antes e depois da ação (`null` na criação e na exclusão, respectivamente).
+  antes     Json?
+  depois    Json?
+  ocorreuEm DateTime           @map("ocorreu_em") @db.Timestamptz(3)
+
+  @@index([tipoId, ocorreuEm])
+  @@index([ocorreuEm])
+  @@map("iniciativas_tipos_log")
 }
 
 /// owner: iniciativas

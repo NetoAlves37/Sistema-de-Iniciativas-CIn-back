@@ -8,6 +8,7 @@ import { FakeClock } from '@/shared/testing/fake-clock';
 import {
   AutorNaoPodeDecidirError,
   SomenteAutorError,
+  SomenteComiteError,
   TransicaoInvalidaError,
 } from './errors/iniciativas.errors';
 import { Iniciativa } from './iniciativa';
@@ -449,6 +450,70 @@ describe('Iniciativa: permissoesPara', () => {
       votacaoVencida.permissoesPara(comum('x'), clockEm(new Date('2026-11-09T00:00:00Z')))
         .podeVotar,
     ).toBe(false);
+  });
+});
+
+describe('Iniciativa: alteração de datas (comitê ou ADMIN, só aprovadas)', () => {
+  const comite = { id: 'carla', ehComite: true };
+  const novas = { inicio: '2026-12-20', fim: '2026-12-22', horaInicio: '10:00', horaFim: '12:00' };
+
+  it('troca só datas e horários, mantém o status e registra APROVADA → APROVADA', () => {
+    const iniciativa = umaIniciativa().aprovada().construir();
+    const antes = iniciativa.dados;
+
+    iniciativa.alterarDatas(novas, comite, clockEm());
+
+    expect(iniciativa.status).toBe('APROVADA');
+    expect(iniciativa.dados).toMatchObject({ ...novas, titulo: antes.titulo, tipo: antes.tipo });
+    expect(iniciativa.novasTransicoes()).toEqual([
+      expect.objectContaining({
+        de: 'APROVADA',
+        para: 'APROVADA',
+        por: 'carla',
+        ocorreuEm: T0,
+        nota: 'Datas alteradas: de 10/12/2026 a 11/12/2026, 09:00–18:00 para 20/12/2026 a 22/12/2026, 10:00–12:00',
+      }),
+    ]);
+    expect(iniciativa.pullEvents().map((e) => e.constructor.name)).toEqual([
+      'DatasIniciativaAlteradas',
+    ]);
+  });
+
+  it('um dia só, sem horário, aparece como "(dia inteiro)" na nota', () => {
+    const iniciativa = umaIniciativa().aprovada().construir();
+    iniciativa.alterarDatas(
+      { inicio: '2026-12-20', fim: '2026-12-20', horaInicio: null, horaFim: null },
+      comite,
+      clockEm(),
+    );
+    expect(iniciativa.novasTransicoes()[0].nota).toMatch(/para 20\/12\/2026 \(dia inteiro\)$/);
+  });
+
+  it('quem não é do comitê recebe 403, mesmo sendo o autor', () => {
+    const iniciativa = umaIniciativa().doAutor('ana').aprovada().construir();
+    expect(() =>
+      iniciativa.alterarDatas(novas, { id: 'ana', ehComite: false }, clockEm()),
+    ).toThrow(SomenteComiteError);
+  });
+
+  it.each(['EM_ANDAMENTO', 'EM_VOTACAO', 'EM_ANALISE', 'REPROVADA'] as const)(
+    'em %s recebe 409',
+    (status) => {
+      const iniciativa = umaIniciativa().noStatus(status).construir();
+      expect(() => iniciativa.alterarDatas(novas, comite, clockEm())).toThrow(
+        TransicaoInvalidaError,
+      );
+      expect(iniciativa.novasTransicoes()).toEqual([]);
+    },
+  );
+
+  it('datas inválidas não mudam nada', () => {
+    const iniciativa = umaIniciativa().aprovada().construir();
+    expect(() =>
+      iniciativa.alterarDatas({ ...novas, fim: '2026-12-01' }, comite, clockEm()),
+    ).toThrow();
+    expect(iniciativa.dados.inicio).toBe('2026-12-10');
+    expect(iniciativa.novasTransicoes()).toEqual([]);
   });
 });
 

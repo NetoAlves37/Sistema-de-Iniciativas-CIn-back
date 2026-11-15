@@ -127,6 +127,14 @@ export interface PaginaDto<T> {
 }
 
 /** Ator de uma operação: quem está pedindo e se pode agir como comitê. */
+/** Corpo de `PATCH /iniciativas/:id/datas`: só datas e horários (validados no domínio). */
+export interface DatasIniciativaInput {
+  inicio?: string;
+  fim?: string;
+  horaInicio?: string | null;
+  horaFim?: string | null;
+}
+
 export interface AtorDto {
   id: string;
   nome: string;

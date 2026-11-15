@@ -32,8 +32,19 @@ export class AutorNaoPodeDecidirError extends DomainError {
   }
 }
 
+/** Só o comitê (ou o ADMIN) altera as datas de uma iniciativa aprovada. */
+export class SomenteComiteError extends DomainError {
+  readonly code = 'SOMENTE_COMITE';
+  readonly tipo = 'proibido' as const;
+
+  constructor(acao = 'alterar as datas desta iniciativa') {
+    super(`Só o comitê ou um administrador pode ${acao}.`);
+  }
+}
+
 export type OperacaoDeEstado =
   | 'editar'
+  | 'alterarDatas'
   | 'ressubmeter'
   | 'decidir'
   | 'encerrarRefinamento'
@@ -62,6 +73,8 @@ export class TransicaoInvalidaError extends DomainError {
         return status === 'APROVADA' || status === 'REPROVADA'
           ? 'Esta iniciativa já foi decidida.'
           : 'Esta iniciativa ainda não está em análise.';
+      case 'alterarDatas':
+        return 'Só iniciativas aprovadas podem ter as datas alteradas.';
       default:
         return `Operação inválida para iniciativas com status "${rotulo}".`;
     }
@@ -75,5 +88,33 @@ export class ConcorrenciaError extends DomainError {
 
   constructor(mensagem = 'Esta iniciativa foi alterada por outra pessoa. Recarregue a página.') {
     super(mensagem);
+  }
+}
+
+export class TipoNaoEncontradoError extends DomainError {
+  readonly code = 'TIPO_NAO_ENCONTRADO';
+  readonly tipo = 'nao_encontrado' as const;
+
+  constructor() {
+    super('Tipo de iniciativa não encontrado.');
+  }
+}
+
+/** Tipo com iniciativas associadas não pode ser excluído (só desativado). */
+export class TipoEmUsoError extends DomainError {
+  readonly code = 'TIPO_EM_USO';
+  readonly tipo = 'conflito' as const;
+
+  constructor(readonly quantidade?: number) {
+    super(TipoEmUsoError.mensagem(quantidade));
+  }
+
+  private static mensagem(quantidade?: number): string {
+    const sufixo = 'Você pode desativá-lo.';
+    if (quantidade === undefined) {
+      return `Este tipo não pode ser excluído porque há iniciativas associadas a ele. ${sufixo}`;
+    }
+    const iniciativas = quantidade === 1 ? 'iniciativa associada' : 'iniciativas associadas';
+    return `Este tipo não pode ser excluído porque há ${quantidade} ${iniciativas} a ele. ${sufixo}`;
   }
 }
