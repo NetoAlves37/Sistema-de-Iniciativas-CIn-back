@@ -1,4 +1,4 @@
-// Seed de DESENVOLVIMENTO / demonstração (IT-06). Nunca roda em produção.
+// Seed de DESENVOLVIMENTO / demonstração (IT-06). Nunca roda em produção (travas abaixo).
 //
 //   npm run seed
 //
@@ -14,10 +14,35 @@ try {
   // sem .env: usa o ambiente
 }
 
+// --- travas (ADR-025): dados de exemplo NUNCA podem chegar a um banco real -----------------
+// 1. NODE_ENV=production: recusa sempre, sem exceção.
+// 2. Banco fora desta máquina: recusa, a menos que PERMITIR_SEED_DEMO=true (por exemplo, um
+//    servidor de demonstração). O banco de produção nunca é local, então fica protegido mesmo
+//    que o deploy esqueça o NODE_ENV.
+const HOSTS_LOCAIS = new Set(['localhost', '127.0.0.1', '::1', '[::1]', 'postgres', 'host.docker.internal']);
+
 if (process.env.NODE_ENV === 'production') {
   console.error('O seed de demonstração não roda em produção (NODE_ENV=production).');
   process.exit(1);
 }
+
+let alvo;
+try {
+  alvo = new URL(process.env.DATABASE_URL ?? '');
+} catch {
+  console.error('DATABASE_URL ausente ou inválida: o seed não sabe em qual banco gravaria.');
+  process.exit(1);
+}
+const descricaoDoAlvo = `${alvo.hostname}:${alvo.port || '5432'}${decodeURIComponent(alvo.pathname)}`;
+if (!HOSTS_LOCAIS.has(alvo.hostname.toLowerCase()) && process.env.PERMITIR_SEED_DEMO !== 'true') {
+  console.error(
+    `Seed recusado: o banco ${descricaoDoAlvo} não está nesta máquina. Os dados de exemplo ` +
+      '(usuários e iniciativas fictícios) só vão para bancos locais. Para um servidor de ' +
+      'demonstração, defina PERMITIR_SEED_DEMO=true. NUNCA faça isso em produção.',
+  );
+  process.exit(1);
+}
+console.log(`Seed de demonstração no banco ${descricaoDoAlvo}.`);
 
 const prisma = new PrismaClient();
 
@@ -35,6 +60,13 @@ const USUARIOS = {
 };
 
 const TIPO = { Extensão: 'EXTENSAO', Pesquisa: 'PESQUISA', Evento: 'EVENTO' };
+// Os tipos são um cadastro (tela "Tipos de iniciativa") e um banco novo começa sem nenhum.
+// As iniciativas de exemplo usam estes três, então o seed os cadastra se faltarem.
+const TIPOS_DO_SEED = [
+  { code: 'EXTENSAO', label: 'Extensão', cor: '#9BE0A0' },
+  { code: 'PESQUISA', label: 'Pesquisa', cor: '#A7C7F2' },
+  { code: 'EVENTO', label: 'Evento', cor: '#F7AE85' },
+];
 const PERIODICIDADE = {
   'Evento único': 'EVENTO_UNICO',
   Diária: 'DIARIA',
@@ -192,6 +224,11 @@ const INICIATIVAS = [
 const idDe = (n) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 async function main() {
+  for (const tipo of TIPOS_DO_SEED) {
+    // Não sobrescreve nome, cor nem ativo de um tipo que o comitê já tenha alterado.
+    await prisma.tipoIniciativa.upsert({ where: { code: tipo.code }, update: {}, create: tipo });
+  }
+
   const lookup = async (model) => new Map((await model.findMany()).map((l) => [l.code, l.id]));
   const [perfis, status, tipos, periodicidades] = await Promise.all([
     lookup(prisma.perfilUsuario),
