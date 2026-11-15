@@ -1,0 +1,9 @@
+- Finding files
+Processed 156 files (1.1s) 
+
+✖ Found 3 circular dependencies!
+
+1) modules/iniciativas/iniciativas.module.ts > modules/divulgacao/divulgacao.module.ts
+2) modules/iniciativas/iniciativas.module.ts > modules/refinamento/refinamento.module.ts
+3) modules/iniciativas/iniciativas.module.ts > modules/votacao/votacao.module.ts
+

@@ -19,8 +19,8 @@ aqui, com o motivo.
 | Forma | Situação | Achados brutos | Aceitos | Descartados |
 |---|---|---|---|---|
 | Ferramenta: Biome 2.4.16 | Feita em 15/11/2026 | 32 | (preencher na triagem) | (preencher) |
-| Ferramenta: jscpd (duplicação) | Aguardando autorização para `npx` | — | — | — |
-| Ferramenta: madge (dependências) | Aguardando autorização para `npx` | — | — | — |
+| Ferramenta: jscpd 4.3.0 (duplicação) | Feita em 15/11/2026 | 7 clones | (preencher) | (preencher) |
+| Ferramenta: madge 8.0.0 (dependências) | Feita em 15/11/2026 | 3 ciclos | (preencher) | (preencher) |
 | LLM | Rodadas 1 a 7 abaixo (a fazer) | — | — | — |
 | Leitura manual | Roteiro abaixo (a fazer) | — | — | — |
 
@@ -58,18 +58,53 @@ para a análise, pela linha de comando, sem alterar o `biome.json`. Saída compl
 Dica: nas fábricas `useFactory` do Nest, receber muitas dependências é normal (é injeção de
 dependência). Esses achados tendem a ser falsos positivos, e vale anotar o porquê.
 
-### 1.2 jscpd e madge (opcionais)
+### 1.2 jscpd 4.3.0 (código duplicado)
 
-Precisam de `npx`, que baixa os pacotes na primeira execução (não entram no `package.json`).
-Comandos previstos:
+Rodado com `npx` só para a análise, sem entrar no `package.json`. Configuração padrão (mínimo
+de 5 linhas e 50 tokens por clone). Saídas: [`ferramentas/jscpd.txt`](ferramentas/jscpd.txt) e
+[`ferramentas/jscpd/jscpd-report.md`](ferramentas/jscpd/jscpd-report.md).
 
 ```bash
-npx jscpd@4 src --ignore "**/*.spec.ts,**/testing/**" --reporters console,markdown --output docs/qualidade/ferramentas/jscpd
-npx madge@8 --ts-config tsconfig.json --extensions ts --circular src
+npx jscpd@4 src/modules src/shared --ignore "**/*.spec.ts,**/testing/**" --reporters console,markdown --output docs/qualidade/ferramentas/jscpd
 ```
 
-O projeto já tem um teste de arquitetura (`src/architecture.spec.ts`, com ts-morph) que controla
-as dependências entre camadas e módulos. Ele pode ser citado como evidência do que já é verificado.
+Resultado: 120 arquivos, 5.925 linhas, **7 clones, 86 linhas duplicadas (1,45%)**.
+
+| # | Clone | Tamanho | Decisão | Motivo | Quem confirmou |
+|---|---|---|---|---|---|
+| 1 | `refinamento/infrastructure/adapters/iniciativa.adapter.ts` [1-19] = `votacao/infrastructure/adapters/iniciativa.adapter.ts` [1-19] | 18 linhas | | | |
+| 2 | `iniciativas/presentation/http/iniciativas.dto.ts` [51-57] = mesmo arquivo [21-27] | 6 linhas | | | |
+| 3 | `iniciativas/presentation/http/iniciativas.controller.ts` [7-18] = `tipos-iniciativa.controller.ts` [8-19] | 11 linhas | | | |
+| 4 | `iniciativas/application/use-cases/editar-iniciativa.ts` [11-21] = `ressubmeter-iniciativa.ts` [13-23] | 10 linhas | | | |
+| 5 | `divulgacao/application/dto/divulgacao.dto.ts` [30-45] = `iniciativas/application/ports/iniciativa-leitura.port.ts` [49-64] | 15 linhas | | | |
+| 6 | `avaliacao/presentation/http/avaliacao.controller.ts` [8-17] = `iniciativas/.../tipos-iniciativa.controller.ts` [9-18] | 9 linhas | | | |
+| 7 | `avaliacao/application/dto/avaliacao.dto.ts` [18-35] = `divulgacao/application/dto/divulgacao.dto.ts` [12-29] | 17 linhas | | | |
+
+Observação para a reflexão final: o jscpd **não** encontrou a lista `PERIODICIDADES` repetida em
+`divulgacao/domain/periodicidade.ts:1` e `iniciativas/domain/tipos.ts:11`, porque ela ocupa uma
+linha só, abaixo do mínimo de tokens. Os clones 3 e 6 parecem ser cabeçalhos de controller
+(imports e decorators), candidatos a falso positivo.
+
+### 1.3 madge 8.0.0 (dependências e ciclos)
+
+Saída: [`ferramentas/madge-circular.txt`](ferramentas/madge-circular.txt).
+
+```bash
+npx madge@8 --ts-config tsconfig.json --extensions ts --exclude '\.spec\.ts$|/testing/' --circular src
+```
+
+Resultado: 156 arquivos, **3 dependências circulares**, todas no nível dos módulos Nest:
+
+| # | Ciclo | Decisão | Motivo | Quem confirmou |
+|---|---|---|---|---|
+| 1 | `iniciativas.module.ts` ↔ `divulgacao.module.ts` | | | |
+| 2 | `iniciativas.module.ts` ↔ `refinamento.module.ts` | | | |
+| 3 | `iniciativas.module.ts` ↔ `votacao.module.ts` | | | |
+
+São o ciclo conhecido da ADR-013 (resolvido em tempo de execução com `ModuleRef` preguiçoso). O
+madge confirma com ferramenta o que a ADR registrava em texto. O projeto também tem um teste de
+arquitetura (`src/architecture.spec.ts`, com ts-morph) que controla as dependências entre camadas
+e módulos e pode ser citado como evidência do que já é verificado automaticamente.
 
 ---
 
