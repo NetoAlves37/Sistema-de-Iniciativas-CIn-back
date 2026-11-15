@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { Periodicidade, TipoIniciativa } from '@/shared/domain/vocabulario-iniciativa';
 import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
 import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
 import { Iniciativa, type IniciativaProps } from '../../domain/iniciativa';
@@ -8,7 +9,6 @@ import type {
   IniciativaRepository,
 } from '../../domain/ports/iniciativa.repository';
 import { STATUS_ATIVOS, type StatusIniciativa } from '../../domain/status';
-import type { Periodicidade, TipoIniciativa } from '../../domain/tipos';
 import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
 
 type LinhaIniciativa = Prisma.IniciativaGetPayload<{

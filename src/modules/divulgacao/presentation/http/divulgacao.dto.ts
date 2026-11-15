@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { PaginationQuerySchema } from '@/common/pagination/pagination-query.dto';
-import { FORMATO_CODIGO_TIPO } from '../../domain/periodicidade';
+import { FORMATO_CODIGO_TIPO } from '@/shared/domain/vocabulario-iniciativa';
 
 const CODIGO_TIPO = z.string().regex(FORMATO_CODIGO_TIPO, 'Código de tipo inválido.');
 

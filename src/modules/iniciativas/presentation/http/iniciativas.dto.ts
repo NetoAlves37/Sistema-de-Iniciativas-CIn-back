@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { FORMATO_CODIGO_TIPO, PERIODICIDADES } from '@/shared/domain/vocabulario-iniciativa';
 import { STATUS_INICIATIVA } from '../../domain/status';
-import { FORMATO_CODIGO_TIPO, PERIODICIDADES } from '../../domain/tipos';
 
 /**
  * Corpo de `POST /iniciativas`, `PATCH /iniciativas/:id` e `POST /iniciativas/:id/ressubmissao`.

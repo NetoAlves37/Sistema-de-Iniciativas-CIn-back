@@ -4,7 +4,7 @@ import {
   PERIODICIDADES,
   type Periodicidade,
   type TipoIniciativa,
-} from '../tipos';
+} from '@/shared/domain/vocabulario-iniciativa';
 
 /** Entrada bruta (como veio do HTTP). Todos os campos são validados aqui (RN-01 e RN-02). */
 export interface DadosIniciativaBrutos {

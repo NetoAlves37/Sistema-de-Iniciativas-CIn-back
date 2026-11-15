@@ -1,5 +1,5 @@
+import type { Periodicidade, TipoIniciativa } from '@/shared/domain/vocabulario-iniciativa';
 import type { StatusIniciativa } from '../../domain/status';
-import type { Periodicidade, TipoIniciativa } from '../../domain/tipos';
 
 export type { Periodicidade, StatusIniciativa, TipoIniciativa };
 
