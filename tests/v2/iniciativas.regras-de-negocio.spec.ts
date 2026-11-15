@@ -247,21 +247,11 @@ describe('US02 - Avaliação de Iniciativa', () => {
     });
   });
 
-  it.each([undefined, null, '', '   '])(
-    'US02 reprovação com justificativa %j | Partição de Equivalência (classe inválida) | erro',
-    async (justificativa) => {
-      // Requisito: US02 - reprovar sem justificativa é erro
-      // Técnica: Partição de Equivalência (undefined, null, vazio, só espaços)
-      // Esperado: rejeita a operação e a iniciativa continua EM_ANALISE
-      // OBS: no código fornecido, nem Iniciativa.decidir nem DecidirIniciativa validam isso
-      // (o comentário diz que é "validado no caso de uso"). Se este teste falhar, é um
-      // defeito real em relação ao critério de aceitação.
-      const { decidir, repositorio } = montar();
-      repositorio.semear(umaIniciativa().comId('i1').doAutor('ana').emAnalise().construir());
-      await expect(decidir.executar('i1', 'carla', 'REPROVADA', justificativa)).rejects.toBeInstanceOf(ValidacaoError);
-      expect(repositorio.persistida('i1').status).toBe('EM_ANALISE');
-    },
-  );
+  // US02 - Reprovar sem justificativa: os 4 testes desta posição (undefined, null, vazio e só espaços)
+  // foram REMOVIDOS na v2. Eles chamavam DecidirIniciativa.executar direto e pulavam a validação feita
+  // por RegistrarDecisao -> validarDecisao (módulo avaliacao), que a v1 não recebeu (erro de camada do
+  // teste, não defeito do sistema). Foram refeitos pelo caminho certo em us02-registrar-decisao.spec.ts
+  // (lacuna L13). A versão original continua preservada em tests/v1-llm/.
 
   it.each(['EM_ANDAMENTO', 'EM_VOTACAO', 'APROVADA', 'REPROVADA'])(
     'US02 avaliar iniciativa em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError',

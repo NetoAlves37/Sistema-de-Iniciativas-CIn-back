@@ -1,8 +1,56 @@
-Quatro grupos de arquivos continuam em 0%, e eles são justamente o trabalho da v2:
-
-| Módulo                     | Arquivos em 0%                                                                                                           | História      |
-|----------------------------|--------------------------------------------------------------------------------------------------------------------------|---------------|
-| divulgacao                 | listar-aprovadas, listar-ocorrencias, datas, intervalo, recorrencia, google-agenda-url, periodicidade, divulgacao.facade | US04          |
-| refinamento                | comentar-iniciativa, comentario, listar-comentarios, contar-sugestoes, refinamento.facade, refinamento.errors            | US06          |
-| iniciativas (consultas)    | consultas-iniciativas, iniciativas.facade                                                                                | US03          |
-| iniciativas (casos de uso) | aplicar-prazos-vencidos (25%), editar-iniciativa (40%), ressubmeter-iniciativa (50%)                                     | US05 e prazos |
+ % Coverage report from v8
+-----------------------------------|---------|----------|---------|---------|-------------------------
+File                               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s       
+-----------------------------------|---------|----------|---------|---------|-------------------------
+All files                          |   44.59 |    40.84 |   38.57 |   46.37 |                         
+ avaliacao/application/queries     |       0 |      100 |       0 |       0 |                         
+  obter-fila.ts                    |       0 |      100 |       0 |       0 | 12-18                   
+ avaliacao/application/use-cases   |       0 |      100 |       0 |       0 |                         
+  registrar-decisao.ts             |       0 |      100 |       0 |       0 | 18-28                   
+ avaliacao/domain                  |       0 |        0 |       0 |       0 |                         
+  decisao.ts                       |       0 |        0 |       0 |       0 | 3-35                    
+ divulgacao/application            |       0 |      100 |       0 |       0 |                         
+  divulgacao.facade.ts             |       0 |      100 |       0 |       0 | 12                      
+ divulgacao/application/queries    |       0 |        0 |       0 |       0 |                         
+  listar-aprovadas.ts              |       0 |        0 |       0 |       0 | 13-17                   
+  listar-ocorrencias.ts            |       0 |        0 |       0 |       0 | 20-54                   
+ divulgacao/domain                 |       0 |        0 |       0 |       0 |                         
+  datas.ts                         |       0 |        0 |       0 |       0 | 5-46                    
+  google-agenda-url.ts             |       0 |        0 |       0 |       0 | 18-58                   
+  intervalo.ts                     |       0 |        0 |       0 |       0 | 5-20                    
+  periodicidade.ts                 |       0 |      100 |     100 |       0 | 1-4                     
+  recorrencia.ts                   |       0 |        0 |       0 |       0 | 28-82                   
+ iniciativas/application           |       0 |        0 |       0 |       0 |                         
+  iniciativas.facade.ts            |       0 |        0 |       0 |       0 | 49-135                  
+ iniciativas/application/queries   |       0 |        0 |       0 |       0 |                         
+  consultas-iniciativas.ts         |       0 |        0 |       0 |       0 | 26-226                  
+ iniciativas/application/use-cases |   67.46 |    34.61 |   71.42 |   72.22 |                         
+  alterar-iniciativa.ts            |    90.9 |       50 |     100 |     100 | 23                      
+  aplicar-prazos-vencidos.ts       |   22.22 |        0 |   33.33 |      25 | 23-36                   
+  carregar-com-prazos.ts           |   78.26 |       30 |     100 |   88.88 | 42-43                   
+  decidir-iniciativa.ts            |   88.88 |       75 |     100 |     100 | 28                      
+  editar-iniciativa.ts             |      40 |        0 |   33.33 |      40 | 14-16                   
+  ressubmeter-iniciativa.ts        |      50 |        0 |   33.33 |      50 | 16-18                   
+  submeter-iniciativa.ts           |     100 |      100 |     100 |     100 |                         
+ iniciativas/domain                |   89.32 |    80.95 |   90.32 |   88.88 |                         
+  iniciativa.ts                    |   89.47 |    80.95 |   93.33 |   89.01 | 168,210,246-252,267,274 
+  status.ts                        |      75 |      100 |       0 |      75 | 20                      
+  tipos.ts                         |     100 |      100 |     100 |     100 |                         
+ iniciativas/domain/errors         |   69.56 |    77.77 |   66.66 |   69.56 |                         
+  iniciativas.errors.ts            |   69.56 |    77.77 |   66.66 |   69.56 | 5-9,66-77               
+ iniciativas/domain/events         |     100 |      100 |     100 |     100 |                         
+  iniciativa.events.ts             |     100 |      100 |     100 |     100 |                         
+ iniciativas/domain/value-objects  |    91.3 |    86.25 |      80 |   93.58 |                         
+  dados-iniciativa.ts              |    91.3 |    86.25 |      80 |   93.58 | 108,130,134,140,164     
+ refinamento/application           |       0 |      100 |       0 |       0 |                         
+  refinamento.facade.ts            |       0 |      100 |       0 |       0 | 27-54                   
+ refinamento/application/queries   |       0 |        0 |       0 |       0 |                         
+  contar-sugestoes.ts              |       0 |        0 |       0 |       0 | 7-12                    
+  listar-comentarios.ts            |       0 |        0 |       0 |       0 | 19-37                   
+ refinamento/application/use-cases |       0 |        0 |       0 |       0 |                         
+  comentar-iniciativa.ts           |       0 |        0 |       0 |       0 | 18-44                   
+ refinamento/domain                |       0 |        0 |       0 |       0 |                         
+  comentario.ts                    |       0 |        0 |       0 |       0 | 3-45                    
+ refinamento/domain/errors         |       0 |      100 |       0 |       0 |                         
+  refinamento.errors.ts            |       0 |      100 |       0 |       0 | 4-17                    
+-----------------------------------|---------|----------|---------|---------|-------------------------

@@ -25,6 +25,8 @@ export default defineConfig({
     'src/modules/divulgacao/application/**/*.ts',
     'src/modules/refinamento/domain/**/*.ts',
     'src/modules/refinamento/application/**/*.ts',
+    'src/modules/avaliacao/domain/**/*.ts',
+    'src/modules/avaliacao/application/**/*.ts',
   ],
   exclude: [
     'src/**/*.spec.ts',
