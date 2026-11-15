@@ -2,6 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { FORMATO_CODIGO_TIPO, PERIODICIDADES } from '@/shared/domain/vocabulario-iniciativa';
 import { STATUS_INICIATIVA } from '../../domain/status';
+import { LIMITES } from '../../domain/value-objects/dados-iniciativa';
 
 /**
  * Corpo de `POST /iniciativas`, `PATCH /iniciativas/:id` e `POST /iniciativas/:id/ressubmissao`.
@@ -15,9 +16,12 @@ export const DadosIniciativaSchema = z.object({
     .string()
     .optional()
     .describe('Código de um tipo ativo do cadastro (GET /tipos-iniciativa), por exemplo PALESTRA'),
-  titulo: z.string().optional().describe('Título (até 120 caracteres)'),
-  resumo: z.string().optional().describe('Descrição resumida (até 280 caracteres)'),
-  detalhe: z.string().optional().describe('Descrição detalhada (até 5000 caracteres)'),
+  titulo: z.string().optional().describe(`Título (até ${LIMITES.titulo} caracteres)`),
+  resumo: z.string().optional().describe(`Descrição resumida (até ${LIMITES.resumo} caracteres)`),
+  detalhe: z
+    .string()
+    .optional()
+    .describe(`Descrição detalhada (até ${LIMITES.detalhe} caracteres)`),
   inicio: z.string().optional().describe('Data de início (YYYY-MM-DD)'),
   fim: z.string().optional().describe('Data de término (YYYY-MM-DD), igual ou posterior ao início'),
   horaInicio: z
@@ -34,10 +38,16 @@ export const DadosIniciativaSchema = z.object({
     .string()
     .optional()
     .describe(`Periodicidade: ${PERIODICIDADES.join(', ')}`),
-  espaco: z.string().optional().describe('Espaço utilizado (até 200 caracteres)'),
-  organizadores: z.string().optional().describe('Organizadores, separados por vírgula (até 500)'),
-  membros: z.string().nullable().optional().describe('Membros (opcional, até 500)'),
-  participantes: z.number().optional().describe('Quantidade de participantes (1 a 100000)'),
+  espaco: z.string().optional().describe(`Espaço utilizado (até ${LIMITES.espaco} caracteres)`),
+  organizadores: z
+    .string()
+    .optional()
+    .describe(`Organizadores, separados por vírgula (até ${LIMITES.organizadores})`),
+  membros: z.string().nullable().optional().describe(`Membros (opcional, até ${LIMITES.membros})`),
+  participantes: z
+    .number()
+    .optional()
+    .describe(`Quantidade de participantes (1 a ${LIMITES.participantesMax})`),
   comVotacao: z.boolean().optional().describe('Enviar para votação geral (padrão: true)'),
 });
 

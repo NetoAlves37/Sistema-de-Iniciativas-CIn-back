@@ -6,6 +6,7 @@ import { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto
 import type { OcorrenciaCalendario, ResumoIniciativa } from '../../application/dto/divulgacao.dto';
 import { ListarAprovadas } from '../../application/queries/listar-aprovadas';
 import { ListarOcorrencias } from '../../application/queries/listar-ocorrencias';
+import { MAXIMO_DIAS_INTERVALO } from '../../domain/intervalo';
 import { AprovadasQueryDto, OcorrenciasQueryDto } from './divulgacao.dto';
 
 @ApiTags('Divulgação')
@@ -49,13 +50,15 @@ export class DivulgacaoController {
   @Get('ocorrencias')
   @ApiOperation({
     summary: 'Ocorrências das aprovadas no calendário',
-    description:
-      'Intervalo `[de, ate)` de no máximo 62 dias. `inicio` e `fim` são `YYYY-MM-DD` (dia inteiro; `fim` exclusivo no Evento único) ou `YYYY-MM-DDTHH:mm`.',
+    description: `Intervalo \`[de, ate)\` de no máximo ${MAXIMO_DIAS_INTERVALO} dias. \`inicio\` e \`fim\` são \`YYYY-MM-DD\` (dia inteiro; \`fim\` exclusivo no Evento único) ou \`YYYY-MM-DDTHH:mm\`.`,
   })
   @ApiResponse({ status: 200, description: 'Lista de ocorrências em ordem cronológica' })
   @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
   @ApiResponse({ status: 403, description: 'Sem permissão de acesso' })
-  @ApiResponse({ status: 422, description: 'Datas inválidas ou intervalo maior que 62 dias' })
+  @ApiResponse({
+    status: 422,
+    description: `Datas inválidas ou intervalo maior que ${MAXIMO_DIAS_INTERVALO} dias`,
+  })
   ocorrencias(
     @GetCurrentUser() user: CurrentUser,
     @Query() query: OcorrenciasQueryDto,

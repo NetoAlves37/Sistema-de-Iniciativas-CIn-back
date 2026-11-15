@@ -2,6 +2,7 @@ import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { PaginationQuerySchema } from '@/common/pagination/pagination-query.dto';
 import { FORMATO_CODIGO_TIPO } from '@/shared/domain/vocabulario-iniciativa';
+import { MAXIMO_DIAS_INTERVALO } from '../../domain/intervalo';
 
 const CODIGO_TIPO = z.string().regex(FORMATO_CODIGO_TIPO, 'Código de tipo inválido.');
 
@@ -24,7 +25,7 @@ export const OcorrenciasQuerySchema = z.object({
   ate: z
     .string()
     .regex(DATA, 'Informe a data no formato AAAA-MM-DD.')
-    .describe('Fim, exclusivo (no máximo 62 dias depois de `de`)'),
+    .describe(`Fim, exclusivo (no máximo ${MAXIMO_DIAS_INTERVALO} dias depois de \`de\`)`),
   tipos: z
     .string()
     .optional()
