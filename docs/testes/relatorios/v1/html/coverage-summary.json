@@ -1,0 +1,219 @@
+{
+  "total": {
+    "lines": { "total": 653, "covered": 257, "skipped": 0, "pct": 39.35 },
+    "statements": { "total": 737, "covered": 276, "skipped": 0, "pct": 37.44 },
+    "functions": { "total": 188, "covered": 62, "skipped": 0, "pct": 32.97 },
+    "branches": { "total": 406, "covered": 141, "skipped": 0, "pct": 34.72 },
+    "branchesTrue": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\avaliacao\\application\\queries\\obter-fila.ts": {
+    "lines": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\avaliacao\\application\\use-cases\\registrar-decisao.ts": {
+    "lines": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\avaliacao\\domain\\decisao.ts": {
+    "lines": { "total": 11, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 12, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 10, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\application\\divulgacao.facade.ts": {
+    "lines": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\application\\queries\\listar-aprovadas.ts": {
+    "lines": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\application\\queries\\listar-ocorrencias.ts": {
+    "lines": { "total": 11, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 13, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 12, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\domain\\datas.ts": {
+    "lines": { "total": 20, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 5, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 22, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 9, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\domain\\google-agenda-url.ts": {
+    "lines": { "total": 18, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 22, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 17, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\domain\\intervalo.ts": {
+    "lines": { "total": 12, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 15, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 10, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\domain\\periodicidade.ts": {
+    "lines": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\divulgacao\\domain\\recorrencia.ts": {
+    "lines": { "total": 27, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 30, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 24, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\iniciativas.facade.ts": {
+    "lines": { "total": 23, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 14, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 24, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\queries\\consultas-iniciativas.ts": {
+    "lines": { "total": 43, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 21, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 56, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 49, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\alterar-datas-iniciativa.ts": {
+    "lines": { "total": 4, "covered": 2, "skipped": 0, "pct": 50 },
+    "functions": { "total": 3, "covered": 1, "skipped": 0, "pct": 33.33 },
+    "statements": { "total": 4, "covered": 2, "skipped": 0, "pct": 50 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\alterar-iniciativa.ts": {
+    "lines": { "total": 9, "covered": 9, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 11, "covered": 10, "skipped": 0, "pct": 90.9 },
+    "branches": { "total": 2, "covered": 1, "skipped": 0, "pct": 50 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\aplicar-prazos-vencidos.ts": {
+    "lines": { "total": 16, "covered": 4, "skipped": 0, "pct": 25 },
+    "functions": { "total": 3, "covered": 1, "skipped": 0, "pct": 33.33 },
+    "statements": { "total": 18, "covered": 4, "skipped": 0, "pct": 22.22 },
+    "branches": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\carregar-com-prazos.ts": {
+    "lines": { "total": 18, "covered": 16, "skipped": 0, "pct": 88.88 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 23, "covered": 18, "skipped": 0, "pct": 78.26 },
+    "branches": { "total": 10, "covered": 3, "skipped": 0, "pct": 30 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\decidir-iniciativa.ts": {
+    "lines": { "total": 8, "covered": 8, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 9, "covered": 8, "skipped": 0, "pct": 88.88 },
+    "branches": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\editar-iniciativa.ts": {
+    "lines": { "total": 8, "covered": 3, "skipped": 0, "pct": 37.5 },
+    "functions": { "total": 3, "covered": 1, "skipped": 0, "pct": 33.33 },
+    "statements": { "total": 8, "covered": 3, "skipped": 0, "pct": 37.5 },
+    "branches": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\ressubmeter-iniciativa.ts": {
+    "lines": { "total": 9, "covered": 4, "skipped": 0, "pct": 44.44 },
+    "functions": { "total": 3, "covered": 1, "skipped": 0, "pct": 33.33 },
+    "statements": { "total": 9, "covered": 4, "skipped": 0, "pct": 44.44 },
+    "branches": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\submeter-iniciativa.ts": {
+    "lines": { "total": 12, "covered": 12, "skipped": 0, "pct": 100 },
+    "functions": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "statements": { "total": 13, "covered": 13, "skipped": 0, "pct": 100 },
+    "branches": { "total": 2, "covered": 2, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\application\\use-cases\\tipos-iniciativa.ts": {
+    "lines": { "total": 45, "covered": 11, "skipped": 0, "pct": 24.44 },
+    "functions": { "total": 19, "covered": 4, "skipped": 0, "pct": 21.05 },
+    "statements": { "total": 55, "covered": 11, "skipped": 0, "pct": 20 },
+    "branches": { "total": 21, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\iniciativa.ts": {
+    "lines": { "total": 104, "covered": 82, "skipped": 0, "pct": 78.84 },
+    "functions": { "total": 34, "covered": 28, "skipped": 0, "pct": 82.35 },
+    "statements": { "total": 110, "covered": 86, "skipped": 0, "pct": 78.18 },
+    "branches": { "total": 71, "covered": 51, "skipped": 0, "pct": 71.83 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\status.ts": {
+    "lines": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "functions": { "total": 1, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\tipo-de-iniciativa.ts": {
+    "lines": { "total": 50, "covered": 2, "skipped": 0, "pct": 4 },
+    "functions": { "total": 15, "covered": 2, "skipped": 0, "pct": 13.33 },
+    "statements": { "total": 59, "covered": 2, "skipped": 0, "pct": 3.38 },
+    "branches": { "total": 32, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\tipos.ts": {
+    "lines": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 },
+    "statements": { "total": 3, "covered": 3, "skipped": 0, "pct": 100 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\errors\\iniciativas.errors.ts": {
+    "lines": { "total": 39, "covered": 16, "skipped": 0, "pct": 41.02 },
+    "functions": { "total": 10, "covered": 5, "skipped": 0, "pct": 50 },
+    "statements": { "total": 39, "covered": 16, "skipped": 0, "pct": 41.02 },
+    "branches": { "total": 15, "covered": 7, "skipped": 0, "pct": 46.66 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\events\\iniciativa.events.ts": {
+    "lines": { "total": 10, "covered": 8, "skipped": 0, "pct": 80 },
+    "functions": { "total": 4, "covered": 3, "skipped": 0, "pct": 75 },
+    "statements": { "total": 10, "covered": 8, "skipped": 0, "pct": 80 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\iniciativas\\domain\\value-objects\\dados-iniciativa.ts": {
+    "lines": { "total": 81, "covered": 74, "skipped": 0, "pct": 91.35 },
+    "functions": { "total": 6, "covered": 4, "skipped": 0, "pct": 66.66 },
+    "statements": { "total": 95, "covered": 85, "skipped": 0, "pct": 89.47 },
+    "branches": { "total": 86, "covered": 74, "skipped": 0, "pct": 86.04 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\refinamento\\application\\refinamento.facade.ts": {
+    "lines": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\refinamento\\application\\queries\\contar-sugestoes.ts": {
+    "lines": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\refinamento\\application\\queries\\listar-comentarios.ts": {
+    "lines": { "total": 11, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 13, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\refinamento\\application\\use-cases\\comentar-iniciativa.ts": {
+    "lines": { "total": 13, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 15, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\refinamento\\domain\\comentario.ts": {
+    "lines": { "total": 15, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 3, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 15, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 4, "covered": 0, "skipped": 0, "pct": 0 }
+  },
+  "C:\\Users\\maria\\SISTEMA DE INICIATIVAS\\backend\\src\\modules\\refinamento\\domain\\errors\\refinamento.errors.ts": {
+    "lines": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 },
+    "functions": { "total": 2, "covered": 0, "skipped": 0, "pct": 0 },
+    "statements": { "total": 6, "covered": 0, "skipped": 0, "pct": 0 },
+    "branches": { "total": 0, "covered": 0, "skipped": 0, "pct": 100 }
+  }
+}
