@@ -18,10 +18,10 @@ aqui, com o motivo.
 
 | Forma | Situação | Achados brutos | Aceitos | Descartados |
 |---|---|---|---|---|
-| Ferramenta: Biome 2.4.16 | Feita em 15/11/2026 | 32 | (preencher na triagem) | (preencher) |
-| Ferramenta: jscpd 4.3.0 (duplicação) | Feita em 15/11/2026 | 7 clones | (preencher) | (preencher) |
-| Ferramenta: madge 8.0.0 (dependências) | Feita em 15/11/2026 | 3 ciclos | (preencher) | (preencher) |
-| LLM: Claude Opus 5.5 | Feita em 15/11/2026, 7 rodadas | 159 | (preencher na triagem) | 1 falso positivo já confirmado (R2 #11) |
+| Ferramenta: Biome 2.4.16 | Feita em 15/11/2026 | 32 | 4 achados, em 2 itens (DT-02 e DT-03) | 20 (seção 4.2); 8 fora da consolidação |
+| Ferramenta: jscpd 4.3.0 (duplicação) | Feita em 15/11/2026 | 7 clones | 1 (DT-04) | 6 fora da consolidação |
+| Ferramenta: madge 8.0.0 (dependências) | Feita em 15/11/2026 | 3 ciclos | 3 (DT-06) | — |
+| LLM: Claude Opus 5.5 | Feita em 15/11/2026, 7 rodadas | 159 | Contribuiu para os 8 itens (DT-01 a DT-08) | 1 falso positivo confirmado (R2 #11); os demais ficaram fora da consolidação |
 | Leitura manual | Roteiro abaixo (a fazer) | — | — | — |
 
 ---
@@ -347,7 +347,7 @@ os candidatos a refatoração, trecho já coberto pela suíte v2.
 |---|---|---|---|---|---|
 | DT-01 | `divulgacao/domain/periodicidade.ts` e `iniciativas/domain/tipos.ts` | `PERIODICIDADES` declarada igual nos dois módulos; `periodicidade.ts` também guarda `TipoIniciativa` e uma cópia de `FORMATO_CODIGO_TIPO` | Duplicated Code; integridade conceitual; coesão | Manual (parte 1); LLM R5 #3 e #4 | **Sim**: pequeno e coberto pela v2 (US01 periodicidade e US04 recorrência) |
 | DT-02 | `iniciativas/domain/value-objects/dados-iniciativa.ts`, `DadosIniciativa.criar` | Método de 84 linhas, complexidade 42, valida 13 campos em sequência; construtor com 13 parâmetros | Long Method; Long Parameter List; SRP | Biome; LLM R1 #15 e #16 | **Sim**: o trecho mais testado da v2 (todos os limites da US01). A assinatura de `criar` fica igual, porque a v1 a usa |
-| DT-03 | DTOs de `iniciativas`, `avaliacao`, `refinamento` e `divulgacao` | Limites do domínio (120, 280, 1000, 2000, 62 dias...) repetidos como números nos schemas e textos | Magic Numbers; Duplicated Code | Biome; LLM R1 #22, R2 #5, R3 #2, R5 #11 | **Sim**: Replace Magic Literal, sem mudar comportamento |
+| DT-03 | DTOs de `iniciativas`, `avaliacao`, `refinamento` e `divulgacao` | Limites do domínio (120, 280, 1000, 2000, 62 dias...) repetidos como números nos schemas e textos | Magic Numbers; Duplicated Code | Manual; LLM R1 #22, R2 #5, R3 #2, R5 #11 (corrigido na seção 4.2: o Biome não analisa strings) | **Sim**: Replace Magic Literal, sem mudar comportamento |
 | DT-04 | `editar-iniciativa.ts` e `ressubmeter-iniciativa.ts` | Mesmo bloco nos dois casos de uso | Duplicated Code | jscpd; LLM R1 #11 | Opcional (coberto pela lacuna L10 da v2) |
 | DT-05 | `iniciativas/domain/iniciativa.ts` `decidir()` e `avaliacao/domain/decisao.ts` | A regra "reprovar exige justificativa" fica fora da entidade que ela protege | Information hiding; coesão | Manual (parte 1); LLM R1 #31, R7 #16 | Não: corrigir acrescenta regra ao domínio (muda comportamento) |
 | DT-06 | `iniciativas.module.ts` × `divulgacao`, `refinamento`, `votacao` | Três dependências circulares entre módulos; a com divulgacao existe só por uma função pura (`googleAgendaUrl`) | Acoplamento; DIP | madge; LLM R1 #2, R5 #1, R7 #1 e #2; ADR-013 | Não: trabalho grande e decisão registrada |
@@ -364,3 +364,46 @@ conceitual; método longo e SRP; números mágicos) e tocam código coberto pela
 fábricas `useFactory` do `iniciativas.module.ts` apontadas pelo Biome (`useMaxParams`), porque
 receber muitas dependências é próprio da injeção de dependência do Nest; os clones 3 e 6 do jscpd
 (cabeçalhos de controller), a confirmar.
+
+### 4.2 Validação da equipe (15/11/2026)
+
+A equipe conferiu os 8 itens sugeridos lendo o código. **Todos foram confirmados** e estão em
+[`divida-tecnica.md`](divida-tecnica.md), com o mesmo ID.
+
+| Item | Resultado | Decisão |
+|---|---|---|
+| DT-01 | Confirmado | Refatorar |
+| DT-02 | Confirmado | Refatorar |
+| DT-03 | Confirmado | Refatorar |
+| DT-04 | Confirmado | Registrar, sem refatoração nesta Sprint |
+| DT-05 | Confirmado | Não é refatoração: colocar a regra em `Iniciativa.decidir()` muda o comportamento observável (testes passariam de falha para sucesso). Tratar à parte, como correção, com o teste escrito antes |
+| DT-06 | Confirmado | Registrar, sem refatoração nesta Sprint |
+| DT-07 | Confirmado | Registrar, sem refatoração nesta Sprint |
+| DT-08 | Confirmado | Registrar, sem refatoração nesta Sprint |
+
+Critérios usados para escolher DT-02, DT-01 e DT-03 (os três atendem a todos): o problema existe
+no código; a mudança preserva o comportamento (refatoração no sentido de Fowler, não correção de
+defeito); existe uma forma objetiva de provar que nada mudou; são pequenos e de categorias
+diferentes.
+
+**Correções feitas na validação:**
+
+- **Origem do DT-03.** A seção 4.1 atribuía o item também ao Biome. O `noMagicNumbers` não analisa
+  o conteúdo de strings, e os limites estão dentro dos textos do Swagger. Dos 11 números do item,
+  o Biome só apontou o `default(50)` da listagem de comentários; os outros 16 números que ele
+  apontou são códigos HTTP (`@HttpCode`), contas de tempo, paginação e a fórmula de relevância,
+  que não fazem parte do item. O DT-03 veio da leitura manual e da LLM.
+- **Ocorrências que faltavam no DT-03:** participantes "1 a 100000", "Limite padrão: 50", o
+  segundo "62 dias" em `divulgacao.controller.ts` e o "até 60 caracteres" do cadastro de tipos.
+- **DT-02:** antes de refatorar, foi conferido que os limites de organizadores, membros e
+  participantes já tinham teste de valor-limite (`dados-iniciativa.spec.ts`).
+
+**Triagem dos achados do Biome** (tabela da seção 1.1), a partir dessa validação:
+
+| Achado | Decisão | Motivo |
+|---|---|---|
+| `dados-iniciativa.ts:85` complexidade 42 e 84 linhas | Aceito (DT-02) | Confirmado lendo o código; refatorado |
+| `dados-iniciativa.ts:62` 13 parâmetros | Aceito (DT-02) | Confirmado; construtor privado passou a receber um objeto |
+| `iniciativas.module.ts` (4 fábricas `useFactory`) | Descartado | Receber muitas dependências é próprio da injeção de dependência do Nest |
+| 17 números mágicos | 1 aceito (no DT-03), 16 descartados | O `default(50)` repetia `LIMITE_PADRAO_COMENTARIOS`. Os outros são códigos HTTP, unidades de tempo nomeadas (`MS_POR_DIA`, `TTL_CACHE_MS`), dias da semana e quinzena na recorrência, paginação e a constante da fórmula de Wilson |
+| Demais parâmetros (`iniciativas.facade.ts`, `iniciativa.ts`, `submeter-iniciativa.ts`, `carregar-com-prazos.ts`, `iniciativa.events.ts`, `prisma-tipo.repository.ts`) | Não incluídos nos 8 itens | Fora da consolidação; não avaliados um a um nesta Sprint |
