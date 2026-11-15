@@ -1,0 +1,642 @@
+Contexto do módulo divulgacao (src/modules/divulgacao, sem testes e sem a pasta testing)
+Commit: b1352d3
+Arquivos (15, 609 linhas):
+- src/modules/divulgacao/application/divulgacao.facade.ts
+- src/modules/divulgacao/application/dto/divulgacao.dto.ts
+- src/modules/divulgacao/application/ports/iniciativas.port.ts
+- src/modules/divulgacao/application/queries/listar-aprovadas.ts
+- src/modules/divulgacao/application/queries/listar-ocorrencias.ts
+- src/modules/divulgacao/divulgacao.module.ts
+- src/modules/divulgacao/divulgacao.tokens.ts
+- src/modules/divulgacao/domain/datas.ts
+- src/modules/divulgacao/domain/google-agenda-url.ts
+- src/modules/divulgacao/domain/intervalo.ts
+- src/modules/divulgacao/domain/periodicidade.ts
+- src/modules/divulgacao/domain/recorrencia.ts
+- src/modules/divulgacao/infrastructure/adapters/iniciativas-facade.adapter.ts
+- src/modules/divulgacao/presentation/http/divulgacao.controller.ts
+- src/modules/divulgacao/presentation/http/divulgacao.dto.ts
+
+// ===== src/modules/divulgacao/application/divulgacao.facade.ts =====
+import { type DadosGoogleAgenda, googleAgendaUrl } from '../domain/google-agenda-url';
+
+export type { DadosGoogleAgenda };
+
+/**
+ * API pública do módulo `divulgacao`. O módulo `iniciativas` a usa para montar o link do
+ * Google Agenda no detalhe das iniciativas aprovadas.
+ */
+export class DivulgacaoFacade {
+  /** Link "Adicionar ao Google Agenda" (HU-20), idêntico ao `gcalUrl()` do protótipo. */
+  googleAgendaUrl(dados: DadosGoogleAgenda): string {
+    return googleAgendaUrl(dados);
+  }
+}
+
+// ===== src/modules/divulgacao/application/dto/divulgacao.dto.ts =====
+import type { Periodicidade, TipoIniciativa } from '../../domain/periodicidade';
+
+export type { Periodicidade, TipoIniciativa };
+
+/** Espelho estrutural do resumo de `iniciativas` (o módulo só o repassa). */
+export interface ResumoIniciativa {
+  id: string;
+  tipo: TipoIniciativa;
+  titulo: string;
+  resumo: string;
+  autor: { id: string; nome: string; perfil: 'ALUNO' | 'PROFESSOR' | 'COMITE' | 'ADMIN' };
+  status: 'EM_ANDAMENTO' | 'EM_VOTACAO' | 'EM_ANALISE' | 'APROVADA' | 'REPROVADA';
+  comVotacao: boolean;
+  ciclo: number;
+  fimRefinamento: string | null;
+  fimVotacao: string | null;
+  prazoAtual: string | null;
+  votos: { likes: number; dislikes: number; relevancia: number };
+  sugestoesCicloAtual: number;
+  inicio: string;
+  fim: string;
+  periodicidade: Periodicidade;
+  espaco: string;
+  criadaEm: string;
+  /** Instante da decisão do comitê; null nos demais status. */
+  decididaEm: string | null;
+}
+
+/** Iniciativa aprovada, com o que o calendário precisa. */
+export interface AprovadaParaCalendario {
+  id: string;
+  titulo: string;
+  tipo: TipoIniciativa;
+  resumo: string;
+  inicio: string;
+  fim: string;
+  horaInicio: string | null;
+  horaFim: string | null;
+  periodicidade: Periodicidade;
+  espaco: string;
+  organizadores: string;
+  autorId: string;
+}
+
+/** Ocorrência no calendário, como a API devolve. */
+export interface OcorrenciaCalendario {
+  iniciativaId: string;
+  titulo: string;
+  tipo: TipoIniciativa;
+  /** `YYYY-MM-DD` (dia inteiro) ou `YYYY-MM-DDTHH:mm`. */
+  inicio: string;
+  /** Mesmo formato do início. Exclusivo no Evento único de dia inteiro. */
+  fim: string;
+  diaInteiro: boolean;
+  espaco: string;
+  organizadores: string;
+  periodicidade: Periodicidade;
+  periodoInicio: string;
+  periodoFim: string;
+  googleAgendaUrl: string;
+}
+
+// ===== src/modules/divulgacao/application/ports/iniciativas.port.ts =====
+import type {
+  AprovadaParaCalendario,
+  ResumoIniciativa,
+  TipoIniciativa,
+} from '../dto/divulgacao.dto';
+
+export interface FiltroAprovadas {
+  q?: string;
+  tipo?: TipoIniciativa;
+  page: number;
+  limit: number;
+}
+
+export interface FiltroCalendario {
+  /** `YYYY-MM-DD`, inclusivo. */
+  de: string;
+  /** `YYYY-MM-DD`, exclusivo. */
+  ate: string;
+  tipos?: TipoIniciativa[];
+  autorId?: string;
+}
+
+/** Porta para o módulo `iniciativas` (implementada em `infrastructure/adapters`). */
+export interface IniciativasPort {
+  /** Aprovadas, em ordem crescente de `inicio`. */
+  listarAprovadas(filtro: FiltroAprovadas): Promise<{ items: ResumoIniciativa[]; total: number }>;
+  aprovadasParaCalendario(filtro: FiltroCalendario): Promise<AprovadaParaCalendario[]>;
+}
+
+// ===== src/modules/divulgacao/application/queries/listar-aprovadas.ts =====
+import type { ResumoIniciativa, TipoIniciativa } from '../dto/divulgacao.dto';
+import type { IniciativasPort } from '../ports/iniciativas.port';
+
+export interface ListarAprovadasInput {
+  q?: string;
+  tipo?: TipoIniciativa;
+  page: number;
+  limit: number;
+}
+
+/** RN-12: aprovadas visíveis a todos, com busca e filtro por tipo feitos no servidor. */
+export class ListarAprovadas {
+  constructor(private readonly iniciativas: IniciativasPort) {}
+
+  executar(input: ListarAprovadasInput): Promise<{ items: ResumoIniciativa[]; total: number }> {
+    const q = input.q?.trim();
+    return this.iniciativas.listarAprovadas({
+      q: q ? q : undefined,
+      tipo: input.tipo,
+      page: input.page,
+      limit: input.limit,
+    });
+  }
+}
+
+// ===== src/modules/divulgacao/application/queries/listar-ocorrencias.ts =====
+import { googleAgendaUrl } from '../../domain/google-agenda-url';
+import { validarIntervalo } from '../../domain/intervalo';
+import { gerarOcorrencias } from '../../domain/recorrencia';
+import type { OcorrenciaCalendario, TipoIniciativa } from '../dto/divulgacao.dto';
+import type { IniciativasPort } from '../ports/iniciativas.port';
+
+export interface ListarOcorrenciasInput {
+  /** `YYYY-MM-DD`, inclusivo. */
+  de: string;
+  /** `YYYY-MM-DD`, exclusivo. Até 62 dias depois de `de`. */
+  ate: string;
+  tipos?: TipoIniciativa[];
+  /** Só as iniciativas do usuário logado (RN-12.6). */
+  minhas?: boolean;
+  usuarioId: string;
+}
+
+/** RN-12: ocorrências das aprovadas em `[de, ate)`. */
+export class ListarOcorrencias {
+  constructor(private readonly iniciativas: IniciativasPort) {}
+
+  async executar(input: ListarOcorrenciasInput): Promise<OcorrenciaCalendario[]> {
+    validarIntervalo(input.de, input.ate);
+    const aprovadas = await this.iniciativas.aprovadasParaCalendario({
+      de: input.de,
+      ate: input.ate,
+      tipos: input.tipos && input.tipos.length > 0 ? input.tipos : undefined,
+      autorId: input.minhas ? input.usuarioId : undefined,
+    });
+
+    const resultado: OcorrenciaCalendario[] = [];
+    for (const iniciativa of aprovadas) {
+      const ocorrencias = gerarOcorrencias(iniciativa, input.de, input.ate);
+      if (ocorrencias.length === 0) continue;
+      const link = googleAgendaUrl(iniciativa);
+      for (const ocorrencia of ocorrencias) {
+        resultado.push({
+          iniciativaId: iniciativa.id,
+          titulo: iniciativa.titulo,
+          tipo: iniciativa.tipo,
+          inicio: ocorrencia.inicio,
+          fim: ocorrencia.fim,
+          diaInteiro: ocorrencia.diaInteiro,
+          espaco: iniciativa.espaco,
+          organizadores: iniciativa.organizadores,
+          periodicidade: iniciativa.periodicidade,
+          periodoInicio: iniciativa.inicio,
+          periodoFim: iniciativa.fim,
+          googleAgendaUrl: link,
+        });
+      }
+    }
+    // Ordem cronológica; a ordenação é estável, então o empate mantém a ordem da fonte.
+    return resultado.sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0));
+  }
+}
+
+// ===== src/modules/divulgacao/divulgacao.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import { DivulgacaoFacade } from './application/divulgacao.facade';
+import type { IniciativasPort } from './application/ports/iniciativas.port';
+import { ListarAprovadas } from './application/queries/listar-aprovadas';
+import { ListarOcorrencias } from './application/queries/listar-ocorrencias';
+import { INICIATIVAS_PORT } from './divulgacao.tokens';
+import { IniciativasFacadeAdapter } from './infrastructure/adapters/iniciativas-facade.adapter';
+import { DivulgacaoController } from './presentation/http/divulgacao.controller';
+
+/**
+ * Listagem de aprovadas, ocorrências do calendário e link do Google Agenda. Sem tabelas.
+ * Dependência circular com `iniciativas`, que usa a `DivulgacaoFacade` no detalhe.
+ */
+@Module({
+  imports: [forwardRef(() => IniciativasModule)],
+  controllers: [DivulgacaoController],
+  providers: [
+    {
+      provide: INICIATIVAS_PORT,
+      useFactory: (facade: IniciativasFacade) => new IniciativasFacadeAdapter(facade),
+      inject: [IniciativasFacade],
+    },
+    {
+      provide: ListarAprovadas,
+      useFactory: (port: IniciativasPort) => new ListarAprovadas(port),
+      inject: [INICIATIVAS_PORT],
+    },
+    {
+      provide: ListarOcorrencias,
+      useFactory: (port: IniciativasPort) => new ListarOcorrencias(port),
+      inject: [INICIATIVAS_PORT],
+    },
+    { provide: DivulgacaoFacade, useFactory: () => new DivulgacaoFacade() },
+  ],
+  exports: [DivulgacaoFacade],
+})
+export class DivulgacaoModule {}
+
+// ===== src/modules/divulgacao/divulgacao.tokens.ts =====
+/** Token da porta `IniciativasPort` (adapter sobre a fachada de `iniciativas`). */
+export const INICIATIVAS_PORT = Symbol('DIVULGACAO_INICIATIVAS_PORT');
+
+// ===== src/modules/divulgacao/domain/datas.ts =====
+/**
+ * Aritmética de datas `YYYY-MM-DD` em UTC, sem depender do fuso da máquina: a data é
+ * tratada como um número de dias desde 1970-01-01.
+ */
+const MS_POR_DIA = 86_400_000;
+const FORMATO_DIA = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Converte `YYYY-MM-DD` em dias desde a época, ou `null` se não for uma data de calendário válida. */
+export function diaParaNumero(dia: string): number | null {
+  const partes = FORMATO_DIA.exec(dia);
+  if (!partes) return null;
+  const [ano, mes, diaDoMes] = [Number(partes[1]), Number(partes[2]), Number(partes[3])];
+  const ms = Date.UTC(ano, mes - 1, diaDoMes);
+  const data = new Date(ms);
+  const confere =
+    data.getUTCFullYear() === ano &&
+    data.getUTCMonth() === mes - 1 &&
+    data.getUTCDate() === diaDoMes;
+  return confere ? ms / MS_POR_DIA : null;
+}
+
+/** Converte dias desde a época em `YYYY-MM-DD`. */
+export function numeroParaDia(numero: number): string {
+  const data = new Date(numero * MS_POR_DIA);
+  const ano = String(data.getUTCFullYear()).padStart(4, '0');
+  const mes = String(data.getUTCMonth() + 1).padStart(2, '0');
+  const diaDoMes = String(data.getUTCDate()).padStart(2, '0');
+  return `${ano}-${mes}-${diaDoMes}`;
+}
+
+/** Soma `n` dias (pode ser negativo) a uma data `YYYY-MM-DD` válida. */
+export function somarDias(dia: string, n: number): string {
+  const numero = diaParaNumero(dia);
+  if (numero === null) throw new RangeError(`Data inválida: ${dia}`);
+  return numeroParaDia(numero + n);
+}
+
+/** Dia do mês (1 a 31) de um número de dias. */
+export function diaDoMes(numero: number): number {
+  return new Date(numero * MS_POR_DIA).getUTCDate();
+}
+
+/** Quantos dias tem o mês em que cai o número de dias. */
+export function diasNoMes(numero: number): number {
+  const data = new Date(numero * MS_POR_DIA);
+  return new Date(Date.UTC(data.getUTCFullYear(), data.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
+// ===== src/modules/divulgacao/domain/google-agenda-url.ts =====
+import { somarDias } from './datas';
+import type { Periodicidade } from './periodicidade';
+
+export interface DadosGoogleAgenda {
+  titulo: string;
+  resumo: string;
+  /** `YYYY-MM-DD` */
+  inicio: string;
+  fim: string;
+  /** `HH:mm` ou `null` (dia inteiro). */
+  horaInicio: string | null;
+  horaFim: string | null;
+  periodicidade: Periodicidade;
+  espaco: string;
+  organizadores: string;
+}
+
+const BASE = 'https://calendar.google.com/calendar/render?';
+
+const REGRA_POR_PERIODICIDADE: Partial<Record<Periodicidade, string>> = {
+  DIARIA: 'FREQ=DAILY',
+  SEMANAL: 'FREQ=WEEKLY',
+  QUINZENAL: 'FREQ=WEEKLY;INTERVAL=2',
+  MENSAL: 'FREQ=MONTHLY',
+};
+
+const semTracos = (dia: string) => dia.replace(/-/g, '');
+const horaCompacta = (hora: string) => `${hora.replace(':', '')}00`;
+
+/** Link "Adicionar ao Google Agenda" (HU-20): porte fiel de `gcalUrl()` do protótipo. */
+export function googleAgendaUrl(dados: DadosGoogleAgenda): string {
+  const multiplosDias = dados.inicio !== dados.fim;
+  let dates: string;
+  if (dados.horaInicio) {
+    const horaFim = dados.horaFim ?? dados.horaInicio;
+    dates = `${semTracos(dados.inicio)}T${horaCompacta(dados.horaInicio)}/${semTracos(dados.inicio)}T${horaCompacta(horaFim)}`;
+  } else {
+    const base = dados.periodicidade === 'EVENTO_UNICO' ? dados.fim : dados.inicio;
+    dates = `${semTracos(dados.inicio)}/${semTracos(somarDias(base, 1))}`;
+  }
+
+  let regra = '';
+  const regraDaPeriodicidade = REGRA_POR_PERIODICIDADE[dados.periodicidade];
+  if (regraDaPeriodicidade && multiplosDias) regra = regraDaPeriodicidade;
+  else if (dados.periodicidade === 'EVENTO_UNICO' && multiplosDias && dados.horaInicio) {
+    regra = 'FREQ=DAILY';
+  }
+
+  const parametros: Record<string, string> = {
+    action: 'TEMPLATE',
+    text: dados.titulo,
+    dates,
+    ctz: 'America/Recife',
+    details: `${dados.resumo}\n\nOrganizadores: ${dados.organizadores}\nIniciativa aprovada no Sistema de Iniciativas do CIn/UFPE.`,
+    location: `${dados.espaco}, Centro de Informática - UFPE`,
+  };
+  if (regra) parametros.recur = `RRULE:${regra};UNTIL=${semTracos(dados.fim)}`;
+  return BASE + new URLSearchParams(parametros).toString();
+}
+
+// ===== src/modules/divulgacao/domain/intervalo.ts =====
+import { ValidacaoError } from '@/shared/domain/domain-error';
+import { diaParaNumero } from './datas';
+
+/** RN-12.4: o calendário consulta no máximo 62 dias por vez. */
+export const MAXIMO_DIAS_INTERVALO = 62;
+
+/** Valida o intervalo `[de, ate)` (datas `YYYY-MM-DD`) do calendário. */
+export function validarIntervalo(de: string, ate: string): void {
+  const inicio = diaParaNumero(de);
+  const fim = diaParaNumero(ate);
+  const erros: Record<string, string> = {};
+  if (inicio === null) erros.de = 'Informe uma data inicial válida (AAAA-MM-DD).';
+  if (fim === null) erros.ate = 'Informe uma data final válida (AAAA-MM-DD).';
+  if (Object.keys(erros).length > 0) throw new ValidacaoError(erros);
+  const dias = (fim as number) - (inicio as number);
+  if (dias <= 0) {
+    throw new ValidacaoError({ ate: 'A data final deve ser posterior à data inicial.' });
+  }
+  if (dias > MAXIMO_DIAS_INTERVALO) {
+    throw new ValidacaoError({
+      ate: `O intervalo deve ter no máximo ${MAXIMO_DIAS_INTERVALO} dias.`,
+    });
+  }
+}
+
+// ===== src/modules/divulgacao/domain/periodicidade.ts =====
+export const PERIODICIDADES = ['EVENTO_UNICO', 'DIARIA', 'SEMANAL', 'QUINZENAL', 'MENSAL'] as const;
+export type Periodicidade = (typeof PERIODICIDADES)[number];
+
+/** Código de um tipo do cadastro de `iniciativas` (por exemplo `PALESTRA`). */
+export type TipoIniciativa = string;
+
+/** Formato do código (o mesmo de `iniciativas`): maiúsculas sem acento, dígitos e `_`. */
+export const FORMATO_CODIGO_TIPO = /^[A-Z0-9_]{1,40}$/;
+
+// ===== src/modules/divulgacao/domain/recorrencia.ts =====
+import { diaDoMes, diaParaNumero, diasNoMes, numeroParaDia, somarDias } from './datas';
+import type { Periodicidade } from './periodicidade';
+
+/** O que a recorrência precisa saber de uma iniciativa aprovada. */
+export interface PeriodoRecorrente {
+  /** `YYYY-MM-DD` */
+  inicio: string;
+  fim: string;
+  /** `HH:mm` ou `null` (dia inteiro). */
+  horaInicio: string | null;
+  horaFim: string | null;
+  periodicidade: Periodicidade;
+}
+
+/**
+ * Uma ocorrência. Dia inteiro: `inicio` e `fim` são `YYYY-MM-DD`. No Evento único, `fim` é
+ * exclusivo (fim do período + 1 dia); nas demais, `fim` é o próprio dia. Com horário:
+ * `YYYY-MM-DDTHH:mm`.
+ */
+export interface Ocorrencia {
+  inicio: string;
+  fim: string;
+  diaInteiro: boolean;
+}
+
+/** O dia (em dias desde a época) cai numa ocorrência da periodicidade? Pressupõe `dia` no período. */
+function ocorreNoDia(periodicidade: Periodicidade, dia: number, primeiroDia: number): boolean {
+  const diferenca = dia - primeiroDia;
+  switch (periodicidade) {
+    case 'SEMANAL':
+      return diferenca % 7 === 0;
+    case 'QUINZENAL':
+      return diferenca % 14 === 0;
+    case 'MENSAL': {
+      const alvo = diaDoMes(primeiroDia);
+      // Mês sem o dia do início (por exemplo, 31): vale o último dia do mês.
+      return diaDoMes(dia) === Math.min(alvo, diasNoMes(dia));
+    }
+    default:
+      return true;
+  }
+}
+
+/**
+ * Ocorrências de uma iniciativa aprovada no intervalo `[de, ate)` (RN-12). `de` e `ate`
+ * já validados (`validarIntervalo`). Nunca sai do período `[inicio, fim]`.
+ */
+export function gerarOcorrencias(
+  periodo: PeriodoRecorrente,
+  de: string,
+  ate: string,
+): Ocorrencia[] {
+  const primeiro = diaParaNumero(periodo.inicio);
+  const ultimo = diaParaNumero(periodo.fim);
+  const janelaInicio = diaParaNumero(de);
+  const janelaFim = diaParaNumero(ate);
+  if (primeiro === null || ultimo === null || janelaInicio === null || janelaFim === null) {
+    return [];
+  }
+
+  const comHorario = periodo.horaInicio !== null;
+  if (periodo.periodicidade === 'EVENTO_UNICO' && !comHorario) {
+    // Um bloco só, do início ao fim; `fim` exclusivo.
+    const fimExclusivo = ultimo + 1;
+    if (primeiro >= janelaFim || fimExclusivo <= janelaInicio) return [];
+    return [{ inicio: periodo.inicio, fim: somarDias(periodo.fim, 1), diaInteiro: true }];
+  }
+
+  const resultado: Ocorrencia[] = [];
+  const horaFim = periodo.horaFim ?? periodo.horaInicio;
+  const comeco = Math.max(primeiro, janelaInicio);
+  const termino = Math.min(ultimo, janelaFim - 1);
+  for (let dia = comeco; dia <= termino; dia++) {
+    if (!ocorreNoDia(periodo.periodicidade, dia, primeiro)) continue;
+    const iso = numeroParaDia(dia);
+    resultado.push(
+      comHorario
+        ? { inicio: `${iso}T${periodo.horaInicio}`, fim: `${iso}T${horaFim}`, diaInteiro: false }
+        : { inicio: iso, fim: iso, diaInteiro: true },
+    );
+  }
+  return resultado;
+}
+
+// ===== src/modules/divulgacao/infrastructure/adapters/iniciativas-facade.adapter.ts =====
+import type { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import type {
+  FiltroAprovadas,
+  FiltroCalendario,
+  IniciativasPort,
+} from '../../application/ports/iniciativas.port';
+
+export class IniciativasFacadeAdapter implements IniciativasPort {
+  constructor(private readonly facade: IniciativasFacade) {}
+
+  listarAprovadas(filtro: FiltroAprovadas) {
+    return this.facade.listar({
+      status: 'APROVADA',
+      ordenar: 'inicio',
+      q: filtro.q,
+      tipo: filtro.tipo,
+      page: filtro.page,
+      limit: filtro.limit,
+    });
+  }
+
+  aprovadasParaCalendario(filtro: FiltroCalendario) {
+    return this.facade.aprovadasParaCalendario({
+      de: filtro.de,
+      ate: filtro.ate,
+      tipos: filtro.tipos,
+      autorId: filtro.autorId,
+    });
+  }
+}
+
+// ===== src/modules/divulgacao/presentation/http/divulgacao.controller.ts =====
+import { Controller, Get, Inject, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto';
+import type { OcorrenciaCalendario, ResumoIniciativa } from '../../application/dto/divulgacao.dto';
+import { ListarAprovadas } from '../../application/queries/listar-aprovadas';
+import { ListarOcorrencias } from '../../application/queries/listar-ocorrencias';
+import { AprovadasQueryDto, OcorrenciasQueryDto } from './divulgacao.dto';
+
+@ApiTags('Divulgação')
+@ApiBearerAuth()
+@Controller({ path: 'divulgacao', version: '1' })
+export class DivulgacaoController {
+  constructor(
+    @Inject(ListarAprovadas) private readonly listarAprovadas: ListarAprovadas,
+    @Inject(ListarOcorrencias) private readonly listarOcorrencias: ListarOcorrencias,
+  ) {}
+
+  @Get('aprovadas')
+  @ApiOperation({
+    summary: 'Lista as iniciativas aprovadas',
+    description: 'Visível a qualquer usuário autenticado. Ordenada pela data de início.',
+  })
+  @ApiResponse({ status: 200, description: 'Página de resumos de iniciativas aprovadas' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  @ApiResponse({ status: 403, description: 'Sem permissão de acesso' })
+  @ApiResponse({ status: 422, description: 'Filtros ou paginação inválidos' })
+  async aprovadas(
+    @Query() query: AprovadasQueryDto,
+  ): Promise<PaginatedResponseDto<ResumoIniciativa>> {
+    const pagina = await this.listarAprovadas.executar({
+      q: query.q,
+      tipo: query.tipo,
+      page: query.page,
+      limit: query.limit,
+    });
+    return {
+      items: pagina.items,
+      meta: {
+        page: query.page,
+        limit: query.limit,
+        total: pagina.total,
+        totalPages: Math.ceil(pagina.total / query.limit),
+      },
+    };
+  }
+
+  @Get('ocorrencias')
+  @ApiOperation({
+    summary: 'Ocorrências das aprovadas no calendário',
+    description:
+      'Intervalo `[de, ate)` de no máximo 62 dias. `inicio` e `fim` são `YYYY-MM-DD` (dia inteiro; `fim` exclusivo no Evento único) ou `YYYY-MM-DDTHH:mm`.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de ocorrências em ordem cronológica' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  @ApiResponse({ status: 403, description: 'Sem permissão de acesso' })
+  @ApiResponse({ status: 422, description: 'Datas inválidas ou intervalo maior que 62 dias' })
+  ocorrencias(
+    @GetCurrentUser() user: CurrentUser,
+    @Query() query: OcorrenciasQueryDto,
+  ): Promise<OcorrenciaCalendario[]> {
+    return this.listarOcorrencias.executar({
+      de: query.de,
+      ate: query.ate,
+      tipos: query.tipos,
+      minhas: query.minhas,
+      usuarioId: user.userId,
+    });
+  }
+}
+
+// ===== src/modules/divulgacao/presentation/http/divulgacao.dto.ts =====
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { PaginationQuerySchema } from '@/common/pagination/pagination-query.dto';
+import { FORMATO_CODIGO_TIPO } from '../../domain/periodicidade';
+
+const CODIGO_TIPO = z.string().regex(FORMATO_CODIGO_TIPO, 'Código de tipo inválido.');
+
+export const AprovadasQuerySchema = PaginationQuerySchema.extend({
+  q: z
+    .string()
+    .trim()
+    .optional()
+    .transform((q) => (q ? q : undefined))
+    .describe('Busca em título, resumo, organizadores e espaço (sem diferenciar maiúsculas)'),
+  tipo: CODIGO_TIPO.optional().describe('Código do tipo (GET /tipos-iniciativa), ex.: PALESTRA'),
+});
+
+export class AprovadasQueryDto extends createZodDto(AprovadasQuerySchema) {}
+
+const DATA = /^\d{4}-\d{2}-\d{2}$/;
+
+export const OcorrenciasQuerySchema = z.object({
+  de: z.string().regex(DATA, 'Informe a data no formato AAAA-MM-DD.').describe('Início, inclusivo'),
+  ate: z
+    .string()
+    .regex(DATA, 'Informe a data no formato AAAA-MM-DD.')
+    .describe('Fim, exclusivo (no máximo 62 dias depois de `de`)'),
+  tipos: z
+    .string()
+    .optional()
+    .transform((csv) =>
+      csv
+        ? csv
+            .split(',')
+            .map((tipo) => tipo.trim())
+            .filter((tipo) => tipo !== '')
+        : [],
+    )
+    .pipe(z.array(CODIGO_TIPO))
+    .describe('Códigos de tipo separados por vírgulas (GET /tipos-iniciativa)'),
+  minhas: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((valor) => valor === 'true')
+    .describe('Só as iniciativas do usuário logado'),
+});
+
+export class OcorrenciasQueryDto extends createZodDto(OcorrenciasQuerySchema) {}

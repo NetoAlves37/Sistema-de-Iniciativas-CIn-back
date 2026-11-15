@@ -1,0 +1,377 @@
+Contexto do módulo avaliacao (src/modules/avaliacao, sem testes e sem a pasta testing)
+Commit: b1352d3
+Arquivos (10, 354 linhas):
+- src/modules/avaliacao/application/dto/avaliacao.dto.ts
+- src/modules/avaliacao/application/ports/iniciativas.port.ts
+- src/modules/avaliacao/application/queries/obter-fila.ts
+- src/modules/avaliacao/application/use-cases/registrar-decisao.ts
+- src/modules/avaliacao/avaliacao.module.ts
+- src/modules/avaliacao/avaliacao.tokens.ts
+- src/modules/avaliacao/domain/decisao.ts
+- src/modules/avaliacao/infrastructure/adapters/iniciativas-facade.adapter.ts
+- src/modules/avaliacao/presentation/http/avaliacao.controller.ts
+- src/modules/avaliacao/presentation/http/avaliacao.dto.ts
+
+// ===== src/modules/avaliacao/application/dto/avaliacao.dto.ts =====
+/** Código de um tipo do cadastro de `iniciativas` (por exemplo `PALESTRA`). */
+export type TipoIniciativa = string;
+export type StatusIniciativa =
+  | 'EM_ANDAMENTO'
+  | 'EM_VOTACAO'
+  | 'EM_ANALISE'
+  | 'APROVADA'
+  | 'REPROVADA';
+export type Periodicidade = 'EVENTO_UNICO' | 'DIARIA' | 'SEMANAL' | 'QUINZENAL' | 'MENSAL';
+
+/** Espelho estrutural do resumo de `iniciativas` (o módulo só o repassa). */
+export interface ResumoIniciativa {
+  id: string;
+  tipo: TipoIniciativa;
+  titulo: string;
+  resumo: string;
+  autor: { id: string; nome: string; perfil: 'ALUNO' | 'PROFESSOR' | 'COMITE' | 'ADMIN' };
+  status: StatusIniciativa;
+  comVotacao: boolean;
+  ciclo: number;
+  fimRefinamento: string | null;
+  fimVotacao: string | null;
+  prazoAtual: string | null;
+  votos: { likes: number; dislikes: number; relevancia: number };
+  sugestoesCicloAtual: number;
+  inicio: string;
+  fim: string;
+  periodicidade: Periodicidade;
+  espaco: string;
+  criadaEm: string;
+  /** Instante da decisão do comitê; null nos demais status. */
+  decididaEm: string | null;
+}
+
+/** Espelho estrutural do detalhe de `iniciativas`. */
+export interface DetalheIniciativa extends ResumoIniciativa {
+  detalhe: string;
+  horaInicio: string | null;
+  horaFim: string | null;
+  organizadores: string;
+  membros: string | null;
+  participantes: number;
+  meuVoto: 1 | -1 | 0;
+  permissoes: {
+    podeEditar: boolean;
+    podeComentar: boolean;
+    podeVotar: boolean;
+    podeDecidir: boolean;
+    motivoNaoPodeDecidir?: string;
+    podeRessubmeter: boolean;
+  };
+  decisao: {
+    resultado: 'APROVADA' | 'REPROVADA';
+    justificativa: string | null;
+    decisor: { nome: string };
+    decididaEm: string;
+  } | null;
+  ultimaJustificativa: string | null;
+  googleAgendaUrl: string | null;
+}
+
+export interface ItemFila extends ResumoIniciativa {
+  /** O usuário logado é o autor: não poderá decidir esta iniciativa (RN-10). */
+  souAutor: boolean;
+}
+
+// ===== src/modules/avaliacao/application/ports/iniciativas.port.ts =====
+import type { DetalheIniciativa, ResumoIniciativa } from '../dto/avaliacao.dto';
+
+export interface AtorAvaliacao {
+  id: string;
+  nome: string;
+  ehComite: boolean;
+}
+
+export interface DecisaoRegistrada {
+  iniciativaId: string;
+  resultado: 'APROVADA' | 'REPROVADA';
+  justificativa: string | null;
+  decisorId: string;
+}
+
+/** Porta para o módulo `iniciativas` (implementada em `infrastructure/adapters`). */
+export interface IniciativasPort {
+  /** Iniciativas em Em análise, da mais para a menos relevante. */
+  listarEmAnalise(
+    page: number,
+    limit: number,
+  ): Promise<{ items: ResumoIniciativa[]; total: number }>;
+  /** As regras do agregado (autor, status, concorrência) vivem do lado de `iniciativas`. */
+  registrarDecisao(decisao: DecisaoRegistrada): Promise<void>;
+  detalhe(iniciativaId: string, ator: AtorAvaliacao): Promise<DetalheIniciativa>;
+}
+
+// ===== src/modules/avaliacao/application/queries/obter-fila.ts =====
+import type { ItemFila } from '../dto/avaliacao.dto';
+import type { IniciativasPort } from '../ports/iniciativas.port';
+
+export interface ObterFilaInput {
+  usuarioId: string;
+  page: number;
+  limit: number;
+}
+
+/** RN-09: fila do comitê, por relevância, com `souAutor` em cada item. */
+export class ObterFila {
+  constructor(private readonly iniciativas: IniciativasPort) {}
+
+  async executar(input: ObterFilaInput): Promise<{ items: ItemFila[]; total: number }> {
+    const pagina = await this.iniciativas.listarEmAnalise(input.page, input.limit);
+    return {
+      total: pagina.total,
+      items: pagina.items.map((item) => ({ ...item, souAutor: item.autor.id === input.usuarioId })),
+    };
+  }
+}
+
+// ===== src/modules/avaliacao/application/use-cases/registrar-decisao.ts =====
+import { validarDecisao } from '../../domain/decisao';
+import type { DetalheIniciativa } from '../dto/avaliacao.dto';
+import type { IniciativasPort } from '../ports/iniciativas.port';
+
+export interface RegistrarDecisaoInput {
+  iniciativaId: string;
+  resultado: string;
+  justificativa?: string | null;
+  decisor: { id: string; nome: string };
+}
+
+/**
+ * RN-10: valida a justificativa e delega a decisão a `iniciativas`, que aplica as regras do
+ * agregado (autor, status, concorrência). Os erros dele sobem intactos. O decisor age como
+ * comitê (membros do comitê e administradores).
+ */
+export class RegistrarDecisao {
+  constructor(private readonly iniciativas: IniciativasPort) {}
+
+  async executar(input: RegistrarDecisaoInput): Promise<DetalheIniciativa> {
+    const decisao = validarDecisao(input.resultado, input.justificativa);
+    await this.iniciativas.registrarDecisao({
+      iniciativaId: input.iniciativaId,
+      resultado: decisao.resultado,
+      justificativa: decisao.justificativa,
+      decisorId: input.decisor.id,
+    });
+    return this.iniciativas.detalhe(input.iniciativaId, {
+      id: input.decisor.id,
+      nome: input.decisor.nome,
+      ehComite: true,
+    });
+  }
+}
+
+// ===== src/modules/avaliacao/avaliacao.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import type { IniciativasPort } from './application/ports/iniciativas.port';
+import { ObterFila } from './application/queries/obter-fila';
+import { RegistrarDecisao } from './application/use-cases/registrar-decisao';
+import { INICIATIVAS_PORT } from './avaliacao.tokens';
+import { IniciativasFacadeAdapter } from './infrastructure/adapters/iniciativas-facade.adapter';
+import { AvaliacaoController } from './presentation/http/avaliacao.controller';
+
+/** Fila e decisão do comitê. Sem tabelas: tudo passa pela fachada de `iniciativas`. */
+@Module({
+  imports: [forwardRef(() => IniciativasModule)],
+  controllers: [AvaliacaoController],
+  providers: [
+    {
+      provide: INICIATIVAS_PORT,
+      useFactory: (facade: IniciativasFacade) => new IniciativasFacadeAdapter(facade),
+      inject: [IniciativasFacade],
+    },
+    {
+      provide: ObterFila,
+      useFactory: (port: IniciativasPort) => new ObterFila(port),
+      inject: [INICIATIVAS_PORT],
+    },
+    {
+      provide: RegistrarDecisao,
+      useFactory: (port: IniciativasPort) => new RegistrarDecisao(port),
+      inject: [INICIATIVAS_PORT],
+    },
+  ],
+})
+export class AvaliacaoModule {}
+
+// ===== src/modules/avaliacao/avaliacao.tokens.ts =====
+/** Token da porta `IniciativasPort` (adapter sobre a fachada de `iniciativas`). */
+export const INICIATIVAS_PORT = Symbol('AVALIACAO_INICIATIVAS_PORT');
+
+// ===== src/modules/avaliacao/domain/decisao.ts =====
+import { ValidacaoError } from '@/shared/domain/domain-error';
+
+export const RESULTADOS_DECISAO = ['APROVADA', 'REPROVADA'] as const;
+export type ResultadoDecisao = (typeof RESULTADOS_DECISAO)[number];
+
+export const LIMITE_JUSTIFICATIVA = 2000;
+
+export interface DecisaoValidada {
+  resultado: ResultadoDecisao;
+  /** `null` na aprovação; na reprovação, o texto sem espaços nas pontas (1 a 2000 caracteres). */
+  justificativa: string | null;
+}
+
+/**
+ * Valida a entrada da decisão do comitê (RN-10): a justificativa é obrigatória na
+ * reprovação (1 a 2000 caracteres após o trim) e ignorada na aprovação.
+ */
+export function validarDecisao(
+  resultado: string,
+  justificativa: string | null | undefined,
+): DecisaoValidada {
+  if (resultado === 'APROVADA') return { resultado, justificativa: null };
+  if (resultado !== 'REPROVADA') {
+    throw new ValidacaoError({ resultado: 'Informe se a iniciativa foi aprovada ou reprovada.' });
+  }
+  const texto = (justificativa ?? '').trim();
+  if (texto.length === 0) {
+    throw new ValidacaoError({ justificativa: 'A justificativa é obrigatória para reprovar.' });
+  }
+  if (texto.length > LIMITE_JUSTIFICATIVA) {
+    throw new ValidacaoError({
+      justificativa: `A justificativa deve ter no máximo ${LIMITE_JUSTIFICATIVA} caracteres.`,
+    });
+  }
+  return { resultado, justificativa: texto };
+}
+
+// ===== src/modules/avaliacao/infrastructure/adapters/iniciativas-facade.adapter.ts =====
+import type { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import type {
+  AtorAvaliacao,
+  DecisaoRegistrada,
+  IniciativasPort,
+} from '../../application/ports/iniciativas.port';
+
+export class IniciativasFacadeAdapter implements IniciativasPort {
+  constructor(private readonly facade: IniciativasFacade) {}
+
+  listarEmAnalise(page: number, limit: number) {
+    return this.facade.listar({ status: 'EM_ANALISE', ordenar: 'relevancia', page, limit });
+  }
+
+  registrarDecisao(decisao: DecisaoRegistrada) {
+    return this.facade.registrarDecisao({
+      iniciativaId: decisao.iniciativaId,
+      resultado: decisao.resultado,
+      justificativa: decisao.justificativa,
+      decisorId: decisao.decisorId,
+    });
+  }
+
+  detalhe(iniciativaId: string, ator: AtorAvaliacao) {
+    return this.facade.detalhe(iniciativaId, ator);
+  }
+}
+
+// ===== src/modules/avaliacao/presentation/http/avaliacao.controller.ts =====
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AccessRole } from '@/common/auth/access-role.enum';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { Roles } from '@/common/auth/decorators/roles.decorator';
+import { PaginatedResponseDto } from '@/common/pagination/paginated-response.dto';
+import { PaginationQueryDto } from '@/common/pagination/pagination-query.dto';
+import type { DetalheIniciativa, ItemFila } from '../../application/dto/avaliacao.dto';
+import { ObterFila } from '../../application/queries/obter-fila';
+import { RegistrarDecisao } from '../../application/use-cases/registrar-decisao';
+import { RegistrarDecisaoDto } from './avaliacao.dto';
+
+@ApiTags('Avaliação')
+@ApiBearerAuth()
+@Roles(AccessRole.COMITE, AccessRole.ADMIN)
+@Controller({ path: 'avaliacao', version: '1' })
+export class AvaliacaoController {
+  constructor(
+    @Inject(ObterFila) private readonly obterFila: ObterFila,
+    @Inject(RegistrarDecisao) private readonly registrarDecisao: RegistrarDecisao,
+  ) {}
+
+  @Get('fila')
+  @ApiOperation({
+    summary: 'Fila de análise do comitê',
+    description:
+      'Iniciativas em Em análise, ordenadas por relevância. `souAutor` indica as do próprio usuário.',
+  })
+  @ApiResponse({ status: 200, description: 'Página de resumos com `souAutor`' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  @ApiResponse({ status: 403, description: 'O usuário não é do comitê nem administrador' })
+  @ApiResponse({ status: 422, description: 'Parâmetros de paginação inválidos' })
+  async fila(
+    @GetCurrentUser() user: CurrentUser,
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedResponseDto<ItemFila>> {
+    const pagina = await this.obterFila.executar({
+      usuarioId: user.userId,
+      page: query.page,
+      limit: query.limit,
+    });
+    return PaginatedResponseDto.of(pagina.items, pagina.total, query);
+  }
+
+  @Post(':id/decisao')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Registra a decisão do comitê (aprovar ou reprovar)',
+    description:
+      'Só em Em análise. O autor não decide a própria iniciativa. A reprovação exige justificativa.',
+  })
+  @ApiResponse({ status: 200, description: 'Detalhe da iniciativa atualizado' })
+  @ApiResponse({ status: 401, description: 'Token ausente ou inválido' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem perfil de comitê, ou o usuário é o autor da iniciativa',
+  })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  @ApiResponse({
+    status: 409,
+    description: 'A iniciativa não está em análise ou já foi decidida',
+  })
+  @ApiResponse({ status: 422, description: 'Resultado inválido ou justificativa ausente' })
+  decidir(
+    @GetCurrentUser() user: CurrentUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RegistrarDecisaoDto,
+  ): Promise<DetalheIniciativa> {
+    return this.registrarDecisao.executar({
+      iniciativaId: id,
+      resultado: body.resultado,
+      justificativa: body.justificativa,
+      decisor: { id: user.userId, nome: user.nome },
+    });
+  }
+}
+
+// ===== src/modules/avaliacao/presentation/http/avaliacao.dto.ts =====
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { RESULTADOS_DECISAO } from '../../domain/decisao';
+
+export const RegistrarDecisaoSchema = z.object({
+  resultado: z.enum(RESULTADOS_DECISAO).describe('APROVADA ou REPROVADA'),
+  justificativa: z
+    .string()
+    .nullish()
+    .describe('Obrigatória na reprovação (1 a 2000 caracteres); ignorada na aprovação'),
+});
+
+export class RegistrarDecisaoDto extends createZodDto(RegistrarDecisaoSchema) {}

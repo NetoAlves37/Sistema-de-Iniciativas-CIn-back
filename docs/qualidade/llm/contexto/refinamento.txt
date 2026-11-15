@@ -1,0 +1,607 @@
+Contexto do módulo refinamento (src/modules/refinamento, sem testes e sem a pasta testing)
+Commit: b1352d3
+Arquivos (17, 570 linhas):
+- src/modules/refinamento/application/dto/comentario.dto.ts
+- src/modules/refinamento/application/ports/autores.port.ts
+- src/modules/refinamento/application/ports/iniciativa.port.ts
+- src/modules/refinamento/application/queries/contar-sugestoes.ts
+- src/modules/refinamento/application/queries/listar-comentarios.ts
+- src/modules/refinamento/application/refinamento.facade.ts
+- src/modules/refinamento/application/use-cases/comentar-iniciativa.ts
+- src/modules/refinamento/domain/comentario.ts
+- src/modules/refinamento/domain/errors/refinamento.errors.ts
+- src/modules/refinamento/domain/ports/comentario.repository.ts
+- src/modules/refinamento/infrastructure/adapters/autores.adapter.ts
+- src/modules/refinamento/infrastructure/adapters/iniciativa.adapter.ts
+- src/modules/refinamento/infrastructure/persistence/prisma-comentario.repository.ts
+- src/modules/refinamento/presentation/http/comentario.dto.ts
+- src/modules/refinamento/presentation/http/comentarios.controller.ts
+- src/modules/refinamento/refinamento.module.ts
+- src/modules/refinamento/refinamento.tokens.ts
+
+// ===== src/modules/refinamento/application/dto/comentario.dto.ts =====
+import type { ComentarioPersistido } from '../../domain/ports/comentario.repository';
+import type { AutorInfo } from '../ports/autores.port';
+
+export type PerfilAutor = 'ALUNO' | 'PROFESSOR' | 'COMITE' | 'ADMIN';
+
+export interface ComentarioDto {
+  id: string;
+  ciclo: number;
+  autor: { id: string; nome: string; perfil: PerfilAutor; ehAutorDaIniciativa: boolean };
+  texto: string;
+  /** ISO 8601 */
+  criadoEm: string;
+}
+
+export interface PaginaDeComentariosDto {
+  items: ComentarioDto[];
+  meta: { page: number; limit: number; total: number; totalPages: number };
+}
+
+export const LIMITE_PADRAO_COMENTARIOS = 50;
+
+export function paraComentarioDto(
+  comentario: ComentarioPersistido,
+  autores: Map<string, AutorInfo>,
+  autorDaIniciativaId: string,
+): ComentarioDto {
+  const autor = autores.get(comentario.autorId);
+  return {
+    id: comentario.id,
+    ciclo: comentario.ciclo,
+    autor: {
+      id: comentario.autorId,
+      nome: autor?.nome ?? 'Usuário desconhecido',
+      perfil: (autor?.perfil as PerfilAutor | undefined) ?? 'ALUNO',
+      ehAutorDaIniciativa: comentario.autorId === autorDaIniciativaId,
+    },
+    texto: comentario.texto,
+    criadoEm: comentario.criadoEm.toISOString(),
+  };
+}
+
+// ===== src/modules/refinamento/application/ports/autores.port.ts =====
+export interface AutorInfo {
+  id: string;
+  nome: string;
+  perfil: string;
+}
+
+/** Porta para o módulo `identidade`. */
+export interface AutoresPort {
+  mapaPorIds(ids: string[]): Promise<Map<string, AutorInfo>>;
+}
+
+// ===== src/modules/refinamento/application/ports/iniciativa.port.ts =====
+export interface EstadoIniciativa {
+  id: string;
+  autorId: string;
+  status: string;
+  ciclo: number;
+}
+
+/** Porta para o módulo `iniciativas`. O estado já vem com os prazos vencidos aplicados. */
+export interface IniciativaPort {
+  obterEstado(iniciativaId: string): Promise<EstadoIniciativa | null>;
+}
+
+// ===== src/modules/refinamento/application/queries/contar-sugestoes.ts =====
+import type {
+  ComentarioRepository,
+  ParIniciativaCiclo,
+} from '../../domain/ports/comentario.repository';
+
+export class ContarSugestoes {
+  constructor(private readonly comentarios: ComentarioRepository) {}
+
+  /** Chave = `iniciativaId`; ausente = 0. */
+  async executar(pares: ParIniciativaCiclo[]): Promise<Map<string, number>> {
+    if (pares.length === 0) return new Map();
+    return this.comentarios.contarPorCiclo(pares);
+  }
+}
+
+// ===== src/modules/refinamento/application/queries/listar-comentarios.ts =====
+import { IniciativaNaoEncontradaError } from '../../domain/errors/refinamento.errors';
+import type { ComentarioRepository } from '../../domain/ports/comentario.repository';
+import {
+  LIMITE_PADRAO_COMENTARIOS,
+  type PaginaDeComentariosDto,
+  paraComentarioDto,
+} from '../dto/comentario.dto';
+import type { AutoresPort } from '../ports/autores.port';
+import type { IniciativaPort } from '../ports/iniciativa.port';
+
+export interface ListarComentariosInput {
+  iniciativaId: string;
+  page?: number;
+  limit?: number;
+}
+
+export class ListarComentarios {
+  constructor(
+    private readonly comentarios: ComentarioRepository,
+    private readonly iniciativas: IniciativaPort,
+    private readonly autores: AutoresPort,
+  ) {}
+
+  async executar(input: ListarComentariosInput): Promise<PaginaDeComentariosDto> {
+    const page = input.page ?? 1;
+    const limit = input.limit ?? LIMITE_PADRAO_COMENTARIOS;
+    const estado = await this.iniciativas.obterEstado(input.iniciativaId);
+    if (!estado) throw new IniciativaNaoEncontradaError();
+
+    const { items, total } = await this.comentarios.listarPorIniciativa(
+      estado.id,
+      (page - 1) * limit,
+      limit,
+    );
+    const autores = await this.autores.mapaPorIds([...new Set(items.map((i) => i.autorId))]);
+    return {
+      items: items.map((item) => paraComentarioDto(item, autores, estado.autorId)),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+}
+
+// ===== src/modules/refinamento/application/refinamento.facade.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type {
+  ComentarioRepository,
+  ParIniciativaCiclo,
+} from '../domain/ports/comentario.repository';
+import type { ComentarioDto, PaginaDeComentariosDto } from './dto/comentario.dto';
+import type { AutoresPort } from './ports/autores.port';
+import type { IniciativaPort } from './ports/iniciativa.port';
+import { ContarSugestoes } from './queries/contar-sugestoes';
+import { ListarComentarios } from './queries/listar-comentarios';
+import { ComentarIniciativa } from './use-cases/comentar-iniciativa';
+
+export type { ComentarioDto, PaginaDeComentariosDto, ParIniciativaCiclo };
+
+/** API pública do módulo `refinamento`. */
+export class RefinamentoFacade {
+  private readonly comentarIniciativa: ComentarIniciativa;
+  private readonly listarComentarios: ListarComentarios;
+  private readonly contarSugestoesUseCase: ContarSugestoes;
+
+  constructor(
+    comentarios: ComentarioRepository,
+    iniciativas: IniciativaPort,
+    autores: AutoresPort,
+    clock: Clock,
+  ) {
+    this.comentarIniciativa = new ComentarIniciativa(comentarios, iniciativas, autores, clock);
+    this.listarComentarios = new ListarComentarios(comentarios, iniciativas, autores);
+    this.contarSugestoesUseCase = new ContarSugestoes(comentarios);
+  }
+
+  /** RN-05. Erros: `nao_encontrado`, `conflito` (fora de Em andamento), `validacao`. */
+  comentar(input: {
+    iniciativaId: string;
+    autorId: string;
+    texto: string;
+  }): Promise<ComentarioDto> {
+    return this.comentarIniciativa.executar(input);
+  }
+
+  listar(input: {
+    iniciativaId: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginaDeComentariosDto> {
+    return this.listarComentarios.executar(input);
+  }
+
+  /**
+   * Quantidade de sugestões de cada `(iniciativa, ciclo)`. Chave do mapa = `iniciativaId`;
+   * ausente = 0. Usada por `iniciativas` para `sugestoesCicloAtual`.
+   */
+  contarSugestoes(pares: ParIniciativaCiclo[]): Promise<Map<string, number>> {
+    return this.contarSugestoesUseCase.executar(pares);
+  }
+}
+
+// ===== src/modules/refinamento/application/use-cases/comentar-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import { Comentario } from '../../domain/comentario';
+import {
+  FaseDeSugestoesEncerradaError,
+  IniciativaNaoEncontradaError,
+} from '../../domain/errors/refinamento.errors';
+import type { ComentarioRepository } from '../../domain/ports/comentario.repository';
+import { type ComentarioDto, paraComentarioDto } from '../dto/comentario.dto';
+import type { AutoresPort } from '../ports/autores.port';
+import type { IniciativaPort } from '../ports/iniciativa.port';
+
+export interface ComentarIniciativaInput {
+  iniciativaId: string;
+  autorId: string;
+  texto: string;
+}
+
+const STATUS_REFINAMENTO = 'EM_ANDAMENTO';
+
+/** RN-05: qualquer usuário autenticado, inclusive o autor, comenta só em Em andamento. */
+export class ComentarIniciativa {
+  constructor(
+    private readonly comentarios: ComentarioRepository,
+    private readonly iniciativas: IniciativaPort,
+    private readonly autores: AutoresPort,
+    private readonly clock: Clock,
+  ) {}
+
+  async executar(input: ComentarIniciativaInput): Promise<ComentarioDto> {
+    const texto = Comentario.validarTexto(input.texto);
+    const estado = await this.iniciativas.obterEstado(input.iniciativaId);
+    if (!estado) throw new IniciativaNaoEncontradaError();
+    if (estado.status !== STATUS_REFINAMENTO) throw new FaseDeSugestoesEncerradaError();
+
+    const comentario = Comentario.criar({
+      iniciativaId: estado.id,
+      ciclo: estado.ciclo,
+      autorId: input.autorId,
+      texto,
+      criadoEm: this.clock.now(),
+    });
+    const salvo = await this.comentarios.salvar(comentario);
+    const autores = await this.autores.mapaPorIds([salvo.autorId]);
+    return paraComentarioDto(salvo, autores, estado.autorId);
+  }
+}
+
+// ===== src/modules/refinamento/domain/comentario.ts =====
+import { ValidacaoError } from '@/shared/domain/domain-error';
+
+export const TEXTO_MAXIMO = 1000;
+
+export const MENSAGEM_TEXTO_VAZIO = 'Escreva sua sugestão antes de enviar.';
+export const MENSAGEM_TEXTO_LONGO = `A sugestão pode ter no máximo ${TEXTO_MAXIMO} caracteres.`;
+
+export interface DadosComentario {
+  iniciativaId: string;
+  ciclo: number;
+  autorId: string;
+  texto: string;
+  criadoEm: Date;
+}
+
+/** Comentário (sugestão) ainda não persistido. O texto é aparado e validado (RN-05). */
+export class Comentario {
+  readonly iniciativaId: string;
+  readonly ciclo: number;
+  readonly autorId: string;
+  readonly texto: string;
+  readonly criadoEm: Date;
+
+  private constructor(dados: DadosComentario) {
+    this.iniciativaId = dados.iniciativaId;
+    this.ciclo = dados.ciclo;
+    this.autorId = dados.autorId;
+    this.texto = dados.texto;
+    this.criadoEm = dados.criadoEm;
+  }
+
+  static criar(dados: DadosComentario): Comentario {
+    return new Comentario({ ...dados, texto: Comentario.validarTexto(dados.texto) });
+  }
+
+  /** Devolve o texto aparado ou lança `ValidacaoError({ texto })`. */
+  static validarTexto(texto: string): string {
+    const aparado = texto.trim();
+    if (aparado.length === 0) {
+      throw new ValidacaoError({ texto: MENSAGEM_TEXTO_VAZIO });
+    }
+    if (aparado.length > TEXTO_MAXIMO) {
+      throw new ValidacaoError({ texto: MENSAGEM_TEXTO_LONGO });
+    }
+    return aparado;
+  }
+}
+
+// ===== src/modules/refinamento/domain/errors/refinamento.errors.ts =====
+import { DomainError } from '@/shared/domain/domain-error';
+
+export class FaseDeSugestoesEncerradaError extends DomainError {
+  readonly code = 'FASE_SUGESTOES_ENCERRADA';
+  readonly tipo = 'conflito' as const;
+
+  constructor() {
+    super('A fase de sugestões terminou.');
+  }
+}
+
+export class IniciativaNaoEncontradaError extends DomainError {
+  readonly code = 'INICIATIVA_NAO_ENCONTRADA';
+  readonly tipo = 'nao_encontrado' as const;
+
+  constructor() {
+    super('Iniciativa não encontrada.');
+  }
+}
+
+// ===== src/modules/refinamento/domain/ports/comentario.repository.ts =====
+import type { Comentario } from '../comentario';
+
+export interface ComentarioPersistido {
+  id: string;
+  iniciativaId: string;
+  ciclo: number;
+  autorId: string;
+  texto: string;
+  criadoEm: Date;
+}
+
+export interface PaginaDeComentarios {
+  items: ComentarioPersistido[];
+  total: number;
+}
+
+export interface ParIniciativaCiclo {
+  iniciativaId: string;
+  ciclo: number;
+}
+
+export interface ComentarioRepository {
+  salvar(comentario: Comentario): Promise<ComentarioPersistido>;
+
+  /** Ordem: ciclo mais recente primeiro; dentro do ciclo, do mais antigo para o mais novo. */
+  listarPorIniciativa(
+    iniciativaId: string,
+    skip: number,
+    take: number,
+  ): Promise<PaginaDeComentarios>;
+
+  /** Chave do mapa = `iniciativaId`; conta os comentários do ciclo pedido. */
+  contarPorCiclo(pares: ParIniciativaCiclo[]): Promise<Map<string, number>>;
+}
+
+// ===== src/modules/refinamento/infrastructure/adapters/autores.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import { IdentidadeFacade } from '@/modules/identidade/application/identidade.facade';
+import type { AutoresPort, AutorInfo } from '../../application/ports/autores.port';
+
+@Injectable()
+export class AutoresAdapter implements AutoresPort {
+  constructor(private readonly identidade: IdentidadeFacade) {}
+
+  async mapaPorIds(ids: string[]): Promise<Map<string, AutorInfo>> {
+    return this.identidade.mapaPorIds(ids);
+  }
+}
+
+// ===== src/modules/refinamento/infrastructure/adapters/iniciativa.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import type { EstadoIniciativa, IniciativaPort } from '../../application/ports/iniciativa.port';
+
+@Injectable()
+export class IniciativaAdapter implements IniciativaPort {
+  constructor(private readonly iniciativas: IniciativasFacade) {}
+
+  async obterEstado(iniciativaId: string): Promise<EstadoIniciativa | null> {
+    const estado = await this.iniciativas.obterEstado(iniciativaId);
+    if (!estado) return null;
+    return {
+      id: estado.id,
+      autorId: estado.autorId,
+      status: estado.status,
+      ciclo: estado.ciclo,
+    };
+  }
+}
+
+// ===== src/modules/refinamento/infrastructure/persistence/prisma-comentario.repository.ts =====
+import { Injectable } from '@nestjs/common';
+import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
+import type { Comentario } from '../../domain/comentario';
+import type {
+  ComentarioPersistido,
+  ComentarioRepository,
+  PaginaDeComentarios,
+  ParIniciativaCiclo,
+} from '../../domain/ports/comentario.repository';
+
+@Injectable()
+export class PrismaComentarioRepository implements ComentarioRepository {
+  constructor(private readonly host: PrismaTransactionHost) {}
+
+  async salvar(comentario: Comentario): Promise<ComentarioPersistido> {
+    return this.host.client.comentario.create({
+      data: {
+        iniciativaId: comentario.iniciativaId,
+        ciclo: comentario.ciclo,
+        autorId: comentario.autorId,
+        texto: comentario.texto,
+        criadoEm: comentario.criadoEm,
+      },
+    });
+  }
+
+  async listarPorIniciativa(
+    iniciativaId: string,
+    skip: number,
+    take: number,
+  ): Promise<PaginaDeComentarios> {
+    const client = this.host.client;
+    const [items, total] = await Promise.all([
+      client.comentario.findMany({
+        where: { iniciativaId },
+        orderBy: [{ ciclo: 'desc' }, { criadoEm: 'asc' }, { id: 'asc' }],
+        skip,
+        take,
+      }),
+      client.comentario.count({ where: { iniciativaId } }),
+    ]);
+    return { items, total };
+  }
+
+  async contarPorCiclo(pares: ParIniciativaCiclo[]): Promise<Map<string, number>> {
+    const contagens = new Map<string, number>();
+    if (pares.length === 0) return contagens;
+    const grupos = await this.host.client.comentario.groupBy({
+      by: ['iniciativaId', 'ciclo'],
+      where: { OR: pares.map((p) => ({ iniciativaId: p.iniciativaId, ciclo: p.ciclo })) },
+      _count: { _all: true },
+    });
+    for (const grupo of grupos) {
+      const atual = contagens.get(grupo.iniciativaId) ?? 0;
+      contagens.set(grupo.iniciativaId, atual + grupo._count._all);
+    }
+    return contagens;
+  }
+}
+
+// ===== src/modules/refinamento/presentation/http/comentario.dto.ts =====
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+const MENSAGEM_TEXTO = 'Escreva sua sugestão antes de enviar.';
+
+export const CriarComentarioSchema = z.object({
+  texto: z
+    .string({ required_error: MENSAGEM_TEXTO, invalid_type_error: MENSAGEM_TEXTO })
+    .describe('Texto da sugestão (1 a 1000 caracteres após remover espaços nas pontas)'),
+});
+
+export class CriarComentarioDto extends createZodDto(CriarComentarioSchema) {}
+
+export const ListarComentariosQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+});
+
+export class ListarComentariosQueryDto extends createZodDto(ListarComentariosQuerySchema) {}
+
+export const ComentarioResponseSchema = z.object({
+  id: z.string().uuid(),
+  ciclo: z.number().int().describe('Ciclo da iniciativa em que o comentário foi feito'),
+  autor: z.object({
+    id: z.string(),
+    nome: z.string(),
+    perfil: z.enum(['ALUNO', 'PROFESSOR', 'COMITE', 'ADMIN']),
+    ehAutorDaIniciativa: z.boolean(),
+  }),
+  texto: z.string(),
+  criadoEm: z.string().describe('Data e hora em ISO 8601'),
+});
+
+export class ComentarioResponseDto extends createZodDto(ComentarioResponseSchema) {}
+
+export const PaginaDeComentariosResponseSchema = z.object({
+  items: z.array(ComentarioResponseSchema),
+  meta: z.object({
+    page: z.number().int(),
+    limit: z.number().int(),
+    total: z.number().int(),
+    totalPages: z.number().int(),
+  }),
+});
+
+export class PaginaDeComentariosResponseDto extends createZodDto(
+  PaginaDeComentariosResponseSchema,
+) {}
+
+// ===== src/modules/refinamento/presentation/http/comentarios.controller.ts =====
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { RefinamentoFacade } from '../../application/refinamento.facade';
+import {
+  ComentarioResponseDto,
+  CriarComentarioDto,
+  ListarComentariosQueryDto,
+  PaginaDeComentariosResponseDto,
+} from './comentario.dto';
+
+@ApiTags('Refinamento')
+@ApiBearerAuth()
+@Controller({ path: 'iniciativas/:id/comentarios', version: '1' })
+export class ComentariosController {
+  constructor(private readonly refinamento: RefinamentoFacade) {}
+
+  @Get()
+  @ApiOperation({
+    summary: 'Lista os comentários da iniciativa',
+    description:
+      'Ciclo mais recente primeiro e, dentro do ciclo, do mais antigo para o mais novo. Limite padrão: 50.',
+  })
+  @ApiResponse({ status: 200, type: PaginaDeComentariosResponseDto })
+  @ApiResponse({ status: 401, description: 'Não autenticado' })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  @ApiResponse({ status: 422, description: 'Parâmetros de paginação inválidos' })
+  listar(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Query() query: ListarComentariosQueryDto,
+  ): Promise<PaginaDeComentariosResponseDto> {
+    return this.refinamento.listar({ iniciativaId: id, page: query.page, limit: query.limit });
+  }
+
+  @Post()
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Comenta (sugere) na iniciativa',
+    description: 'Só enquanto a iniciativa está Em andamento. Qualquer usuário, inclusive o autor.',
+  })
+  @ApiResponse({ status: 201, type: ComentarioResponseDto })
+  @ApiResponse({ status: 401, description: 'Não autenticado' })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  @ApiResponse({ status: 409, description: 'A fase de sugestões terminou' })
+  @ApiResponse({ status: 422, description: 'Texto vazio ou com mais de 1000 caracteres' })
+  comentar(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: CriarComentarioDto,
+    @GetCurrentUser() user: CurrentUser,
+  ): Promise<ComentarioResponseDto> {
+    return this.refinamento.comentar({
+      iniciativaId: id,
+      autorId: user.userId,
+      texto: body.texto,
+    });
+  }
+}
+
+// ===== src/modules/refinamento/refinamento.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IdentidadeModule } from '@/modules/identidade/identidade.module';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import type { Clock } from '@/shared/domain/clock';
+import { CLOCK } from '@/shared/shared.tokens';
+import type { AutoresPort } from './application/ports/autores.port';
+import type { IniciativaPort } from './application/ports/iniciativa.port';
+import { RefinamentoFacade } from './application/refinamento.facade';
+import type { ComentarioRepository } from './domain/ports/comentario.repository';
+import { AutoresAdapter } from './infrastructure/adapters/autores.adapter';
+import { IniciativaAdapter } from './infrastructure/adapters/iniciativa.adapter';
+import { PrismaComentarioRepository } from './infrastructure/persistence/prisma-comentario.repository';
+import { ComentariosController } from './presentation/http/comentarios.controller';
+import { AUTORES_PORT, COMENTARIO_REPOSITORY, INICIATIVA_PORT } from './refinamento.tokens';
+
+@Module({
+  imports: [forwardRef(() => IniciativasModule), IdentidadeModule],
+  controllers: [ComentariosController],
+  providers: [
+    { provide: COMENTARIO_REPOSITORY, useClass: PrismaComentarioRepository },
+    { provide: INICIATIVA_PORT, useClass: IniciativaAdapter },
+    { provide: AUTORES_PORT, useClass: AutoresAdapter },
+    {
+      provide: RefinamentoFacade,
+      useFactory: (
+        comentarios: ComentarioRepository,
+        iniciativas: IniciativaPort,
+        autores: AutoresPort,
+        clock: Clock,
+      ) => new RefinamentoFacade(comentarios, iniciativas, autores, clock),
+      inject: [COMENTARIO_REPOSITORY, INICIATIVA_PORT, AUTORES_PORT, CLOCK],
+    },
+  ],
+  exports: [RefinamentoFacade],
+})
+export class RefinamentoModule {}
+
+// ===== src/modules/refinamento/refinamento.tokens.ts =====
+export const COMENTARIO_REPOSITORY = Symbol('COMENTARIO_REPOSITORY');
+export const INICIATIVA_PORT = Symbol('REFINAMENTO_INICIATIVA_PORT');
+export const AUTORES_PORT = Symbol('REFINAMENTO_AUTORES_PORT');

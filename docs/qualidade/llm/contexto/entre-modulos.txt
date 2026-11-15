@@ -1,0 +1,866 @@
+Contexto entre módulos: shared/domain e as fachadas e módulos Nest de cada módulo
+Commit: b1352d3
+Arquivos (15, 816 linhas):
+- src/shared/domain/clock.ts
+- src/shared/domain/domain-error.ts
+- src/shared/domain/domain-event.ts
+- src/shared/domain/transacao.port.ts
+- src/modules/avaliacao/avaliacao.module.ts
+- src/modules/divulgacao/application/divulgacao.facade.ts
+- src/modules/divulgacao/divulgacao.module.ts
+- src/modules/identidade/application/identidade.facade.ts
+- src/modules/identidade/identidade.module.ts
+- src/modules/iniciativas/application/iniciativas.facade.ts
+- src/modules/iniciativas/iniciativas.module.ts
+- src/modules/refinamento/application/refinamento.facade.ts
+- src/modules/refinamento/refinamento.module.ts
+- src/modules/votacao/application/votacao.facade.ts
+- src/modules/votacao/votacao.module.ts
+
+// ===== src/shared/domain/clock.ts =====
+/**
+ * Relógio injetável (RNF-04): toda regra de prazo lê o tempo daqui, para os testes
+ * poderem simular a passagem do tempo.
+ */
+export interface Clock {
+  now(): Date;
+}
+
+// ===== src/shared/domain/domain-error.ts =====
+/**
+ * Categoria de um erro de domínio. É semântica de negócio, não HTTP: a camada de
+ * apresentação (`HttpExceptionFilter`) traduz cada categoria para um status.
+ *
+ *  - `validacao`: dado inválido (422, com `errors` por campo quando é um `ValidacaoError`);
+ *  - `proibido`: o usuário não pode fazer isso (403);
+ *  - `nao_encontrado`: o recurso não existe (404);
+ *  - `conflito`: o estado atual impede a operação, ou houve concorrência (409).
+ */
+export type TipoErroDominio = 'validacao' | 'proibido' | 'nao_encontrado' | 'conflito';
+
+/**
+ * Base dos erros de domínio. Cada erro carrega um `code` estável, uma categoria e uma
+ * mensagem em português pronta para a tela.
+ */
+export abstract class DomainError extends Error {
+  abstract readonly code: string;
+  abstract readonly tipo: TipoErroDominio;
+
+  constructor(message: string) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
+/** Erro de validação com a mensagem de cada campo inválido (nomes dos campos do DTO). */
+export class ValidacaoError extends DomainError {
+  readonly code = 'VALIDACAO';
+  readonly tipo = 'validacao' as const;
+
+  constructor(
+    readonly campos: Record<string, string>,
+    mensagem = 'Um ou mais campos precisam ser corrigidos.',
+  ) {
+    super(mensagem);
+  }
+}
+
+// ===== src/shared/domain/domain-event.ts =====
+/** Base dos eventos de domínio: classes imutáveis, com o instante em que ocorreram. */
+export abstract class DomainEvent {
+  constructor(readonly ocorreuEm: Date) {}
+}
+
+// ===== src/shared/domain/transacao.port.ts =====
+/**
+ * Executa o trabalho numa transação; os repositórios usam a transação corrente (adapter sobre
+ * o `PrismaTransactionHost`).
+ */
+export interface TransacaoPort {
+  run<T>(trabalho: () => Promise<T>): Promise<T>;
+}
+
+// ===== src/modules/avaliacao/avaliacao.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import type { IniciativasPort } from './application/ports/iniciativas.port';
+import { ObterFila } from './application/queries/obter-fila';
+import { RegistrarDecisao } from './application/use-cases/registrar-decisao';
+import { INICIATIVAS_PORT } from './avaliacao.tokens';
+import { IniciativasFacadeAdapter } from './infrastructure/adapters/iniciativas-facade.adapter';
+import { AvaliacaoController } from './presentation/http/avaliacao.controller';
+
+/** Fila e decisão do comitê. Sem tabelas: tudo passa pela fachada de `iniciativas`. */
+@Module({
+  imports: [forwardRef(() => IniciativasModule)],
+  controllers: [AvaliacaoController],
+  providers: [
+    {
+      provide: INICIATIVAS_PORT,
+      useFactory: (facade: IniciativasFacade) => new IniciativasFacadeAdapter(facade),
+      inject: [IniciativasFacade],
+    },
+    {
+      provide: ObterFila,
+      useFactory: (port: IniciativasPort) => new ObterFila(port),
+      inject: [INICIATIVAS_PORT],
+    },
+    {
+      provide: RegistrarDecisao,
+      useFactory: (port: IniciativasPort) => new RegistrarDecisao(port),
+      inject: [INICIATIVAS_PORT],
+    },
+  ],
+})
+export class AvaliacaoModule {}
+
+// ===== src/modules/divulgacao/application/divulgacao.facade.ts =====
+import { type DadosGoogleAgenda, googleAgendaUrl } from '../domain/google-agenda-url';
+
+export type { DadosGoogleAgenda };
+
+/**
+ * API pública do módulo `divulgacao`. O módulo `iniciativas` a usa para montar o link do
+ * Google Agenda no detalhe das iniciativas aprovadas.
+ */
+export class DivulgacaoFacade {
+  /** Link "Adicionar ao Google Agenda" (HU-20), idêntico ao `gcalUrl()` do protótipo. */
+  googleAgendaUrl(dados: DadosGoogleAgenda): string {
+    return googleAgendaUrl(dados);
+  }
+}
+
+// ===== src/modules/divulgacao/divulgacao.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IniciativasFacade } from '@/modules/iniciativas/application/iniciativas.facade';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import { DivulgacaoFacade } from './application/divulgacao.facade';
+import type { IniciativasPort } from './application/ports/iniciativas.port';
+import { ListarAprovadas } from './application/queries/listar-aprovadas';
+import { ListarOcorrencias } from './application/queries/listar-ocorrencias';
+import { INICIATIVAS_PORT } from './divulgacao.tokens';
+import { IniciativasFacadeAdapter } from './infrastructure/adapters/iniciativas-facade.adapter';
+import { DivulgacaoController } from './presentation/http/divulgacao.controller';
+
+/**
+ * Listagem de aprovadas, ocorrências do calendário e link do Google Agenda. Sem tabelas.
+ * Dependência circular com `iniciativas`, que usa a `DivulgacaoFacade` no detalhe.
+ */
+@Module({
+  imports: [forwardRef(() => IniciativasModule)],
+  controllers: [DivulgacaoController],
+  providers: [
+    {
+      provide: INICIATIVAS_PORT,
+      useFactory: (facade: IniciativasFacade) => new IniciativasFacadeAdapter(facade),
+      inject: [IniciativasFacade],
+    },
+    {
+      provide: ListarAprovadas,
+      useFactory: (port: IniciativasPort) => new ListarAprovadas(port),
+      inject: [INICIATIVAS_PORT],
+    },
+    {
+      provide: ListarOcorrencias,
+      useFactory: (port: IniciativasPort) => new ListarOcorrencias(port),
+      inject: [INICIATIVAS_PORT],
+    },
+    { provide: DivulgacaoFacade, useFactory: () => new DivulgacaoFacade() },
+  ],
+  exports: [DivulgacaoFacade],
+})
+export class DivulgacaoModule {}
+
+// ===== src/modules/identidade/application/identidade.facade.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { UsuarioRepository } from '../domain/ports/usuario.repository';
+import type { RegistrarUsuarioInput, UsuarioDto } from './dto/usuario.dto';
+import { ObterUsuario, ObterUsuarios } from './queries/obter-usuarios';
+import { RegistrarUsuario } from './use-cases/registrar-usuario';
+
+export type { RegistrarUsuarioInput, UsuarioDto };
+
+// Limite do cache de sincronização: evita crescer sem controle em instâncias longevas.
+const LIMITE_CACHE = 5000;
+// Enquanto nome e perfil não mudam, o usuário só é regravado a cada 5 minutos.
+const TTL_CACHE_MS = 5 * 60 * 1000;
+
+interface Sincronizacao {
+  assinatura: string;
+  ate: number;
+}
+
+/**
+ * API pública do módulo `identidade`. Os outros módulos só falam com `identidade`
+ * por aqui, e sempre por portas implementadas em `infrastructure/adapters`.
+ */
+export class IdentidadeFacade {
+  private readonly registrarUsuario: RegistrarUsuario;
+  private readonly obterUsuario: ObterUsuario;
+  private readonly obterUsuarios: ObterUsuarios;
+  /** id → última gravação (assinatura "nome|perfil" e validade), para não escrever a cada requisição. */
+  private readonly sincronizados = new Map<string, Sincronizacao>();
+
+  constructor(
+    usuarios: UsuarioRepository,
+    private readonly clock: Clock,
+  ) {
+    this.registrarUsuario = new RegistrarUsuario(usuarios);
+    this.obterUsuario = new ObterUsuario(usuarios);
+    this.obterUsuarios = new ObterUsuarios(usuarios);
+  }
+
+  /**
+   * Garante que o usuário do token existe localmente com nome e perfil atuais. Grava
+   * quando algo mudou desde o último registro desta instância ou quando o cache de 5
+   * minutos expirou.
+   */
+  async garantirUsuario(input: RegistrarUsuarioInput): Promise<void> {
+    const assinatura = `${input.nome}|${input.perfil}`;
+    const agora = this.clock.now().getTime();
+    const anterior = this.sincronizados.get(input.id);
+    if (anterior && anterior.assinatura === assinatura && anterior.ate > agora) {
+      return;
+    }
+    await this.registrarUsuario.executar(input);
+    if (this.sincronizados.size >= LIMITE_CACHE) {
+      this.sincronizados.clear();
+    }
+    this.sincronizados.set(input.id, { assinatura, ate: agora + TTL_CACHE_MS });
+  }
+
+  obterPorId(id: string): Promise<UsuarioDto> {
+    return this.obterUsuario.executar(id);
+  }
+
+  usuariosPorIds(ids: string[]): Promise<UsuarioDto[]> {
+    return this.obterUsuarios.executar(ids);
+  }
+
+  /** Mapa id → usuário, para exibir autores, comentaristas e decisores. */
+  async mapaPorIds(ids: string[]): Promise<Map<string, UsuarioDto>> {
+    const usuarios = await this.obterUsuarios.executar(ids);
+    return new Map(usuarios.map((usuario) => [usuario.id, usuario]));
+  }
+}
+
+// ===== src/modules/identidade/identidade.module.ts =====
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import type { Clock } from '@/shared/domain/clock';
+import { CLOCK } from '@/shared/shared.tokens';
+import { IdentidadeFacade } from './application/identidade.facade';
+import { PrismaUsuarioRepository } from './infrastructure/persistence/prisma-usuario.repository';
+import { MeController } from './presentation/http/me.controller';
+import { UsuarioSyncGuard } from './presentation/http/usuario-sync.guard';
+
+@Module({
+  controllers: [MeController],
+  providers: [
+    PrismaUsuarioRepository,
+    {
+      provide: IdentidadeFacade,
+      useFactory: (usuarios: PrismaUsuarioRepository, clock: Clock) =>
+        new IdentidadeFacade(usuarios, clock),
+      inject: [PrismaUsuarioRepository, CLOCK],
+    },
+    // Deve ser registrado depois do AuthModule (ordem de import no AppModule).
+    { provide: APP_GUARD, useClass: UsuarioSyncGuard },
+  ],
+  exports: [IdentidadeFacade],
+})
+export class IdentidadeModule {}
+
+// ===== src/modules/iniciativas/application/iniciativas.facade.ts =====
+import type { StatusIniciativa } from '../domain/status';
+import type {
+  AprovadaParaCalendarioDto,
+  AtorDto,
+  DadosIniciativaInput,
+  DatasIniciativaInput,
+  DetalheIniciativaDto,
+  EstadoIniciativaDto,
+  FiltroListagemDto,
+  PaginaDto,
+  ResumoIniciativaDto,
+  TipoIniciativa,
+  TransicaoDto,
+} from './dto/iniciativa.dto';
+import type { ConsultasIniciativas } from './queries/consultas-iniciativas';
+import type { AlterarDatasIniciativa } from './use-cases/alterar-datas-iniciativa';
+import type { AplicarPrazosVencidos } from './use-cases/aplicar-prazos-vencidos';
+import type { CarregarComPrazos } from './use-cases/carregar-com-prazos';
+import type { DecidirIniciativa } from './use-cases/decidir-iniciativa';
+import type { EditarIniciativa } from './use-cases/editar-iniciativa';
+import type { RessubmeterIniciativa } from './use-cases/ressubmeter-iniciativa';
+import type { SubmeterIniciativa } from './use-cases/submeter-iniciativa';
+
+export type * from './dto/iniciativa.dto';
+
+export interface RegistrarDecisaoInput {
+  iniciativaId: string;
+  resultado: 'APROVADA' | 'REPROVADA';
+  justificativa?: string | null;
+  /** Quem decide. O autor da iniciativa nunca pode decidir sobre ela (RN-10). */
+  decisorId: string;
+}
+
+export interface FiltroCalendarioInput {
+  /** Início do intervalo, `YYYY-MM-DD` (inclusivo). */
+  de: string;
+  /** Fim do intervalo, `YYYY-MM-DD` (exclusivo). */
+  ate: string;
+  tipos?: TipoIniciativa[];
+  /** Só as iniciativas deste autor. */
+  autorId?: string;
+}
+
+/**
+ * API pública do módulo `iniciativas`. Os outros módulos só falam com ele por aqui, e
+ * sempre por portas implementadas em `infrastructure/adapters` do módulo consumidor.
+ * É o único módulo que muda o status de uma iniciativa.
+ */
+export class IniciativasFacade {
+  constructor(
+    private readonly submeterIniciativa: SubmeterIniciativa,
+    private readonly editarIniciativa: EditarIniciativa,
+    private readonly ressubmeterIniciativa: RessubmeterIniciativa,
+    private readonly decidirIniciativa: DecidirIniciativa,
+    private readonly consultas: ConsultasIniciativas,
+    private readonly carregar: CarregarComPrazos,
+    private readonly job: AplicarPrazosVencidos,
+    private readonly alterarDatasIniciativa: AlterarDatasIniciativa,
+  ) {}
+
+  // --- contrato usado pelos outros módulos --------------------------------------------------
+
+  /**
+   * Estado da iniciativa para validar operações de outros módulos (votar, comentar).
+   * Aplica antes as transições por prazo vencidas (RN-06). `null` se não existir.
+   */
+  async obterEstado(iniciativaId: string): Promise<EstadoIniciativaDto | null> {
+    const iniciativa = await this.carregar.executar(iniciativaId);
+    if (!iniciativa) return null;
+    return {
+      id: iniciativa.id,
+      autorId: iniciativa.autorId,
+      status: iniciativa.status,
+      ciclo: iniciativa.ciclo,
+      comVotacao: iniciativa.comVotacao,
+      fimRefinamento: iniciativa.fimRefinamento?.toISOString() ?? null,
+      fimVotacao: iniciativa.fimVotacao?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * Registra a decisão do comitê (RN-10). Lança erros de domínio: `proibido` se o decisor
+   * é o autor, `conflito` fora de Em análise ou se já foi decidida, `nao_encontrado` se
+   * não existir. A validação da justificativa fica no caso de uso de `avaliacao`.
+   */
+  registrarDecisao(input: RegistrarDecisaoInput): Promise<void> {
+    return this.decidirIniciativa.executar(
+      input.iniciativaId,
+      input.decisorId,
+      input.resultado,
+      input.justificativa,
+    );
+  }
+
+  /** Listagem paginada de resumos, com filtros e ordenação no banco (RNF-05). */
+  listar(filtro: FiltroListagemDto): Promise<PaginaDto<ResumoIniciativaDto>> {
+    return this.consultas.listar(filtro);
+  }
+
+  /** Detalhe com permissões calculadas para o ator. Lança `nao_encontrado`. */
+  detalhe(iniciativaId: string, ator: AtorDto): Promise<DetalheIniciativaDto> {
+    return this.consultas.detalhe(iniciativaId, ator);
+  }
+
+  /** Iniciativas aprovadas cujo período pode cruzar o intervalo, para gerar ocorrências. */
+  aprovadasParaCalendario(filtro: FiltroCalendarioInput): Promise<AprovadaParaCalendarioDto[]> {
+    return this.consultas.aprovadasParaCalendario(filtro);
+  }
+
+  // --- usado pelos controllers e pelo job do próprio módulo ---------------------------------
+
+  submeter(autorId: string, entrada: DadosIniciativaInput): Promise<string> {
+    return this.submeterIniciativa.executar(autorId, entrada);
+  }
+
+  editar(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
+    return this.editarIniciativa.executar(id, usuarioId, entrada);
+  }
+
+  ressubmeter(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
+    return this.ressubmeterIniciativa.executar(id, usuarioId, entrada);
+  }
+
+  /** Comitê ou ADMIN muda datas e horários de uma aprovada (a série inteira). */
+  alterarDatas(id: string, ator: AtorDto, datas: DatasIniciativaInput): Promise<void> {
+    return this.alterarDatasIniciativa.executar(id, ator, datas);
+  }
+
+  minhas(autorId: string, filtro: { status?: StatusIniciativa; page: number; limit: number }) {
+    return this.consultas.minhas(autorId, filtro);
+  }
+
+  contagens(): Promise<{ emAnalise: number }> {
+    return this.consultas.contagens();
+  }
+
+  historico(iniciativaId: string): Promise<TransicaoDto[]> {
+    return this.consultas.historico(iniciativaId);
+  }
+
+  /** Aplica as transições por prazo vencidas (job). Devolve quantas iniciativas processou. */
+  aplicarPrazosVencidos(): Promise<number> {
+    return this.job.executar();
+  }
+}
+
+// ===== src/modules/iniciativas/iniciativas.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Clock } from '@/shared/domain/clock';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import { TransacaoAdapter } from '@/shared/infrastructure/transacao.adapter';
+import { CLOCK } from '@/shared/shared.tokens';
+import { DivulgacaoModule } from '../divulgacao/divulgacao.module';
+import { IdentidadeModule } from '../identidade/identidade.module';
+import { RefinamentoModule } from '../refinamento/refinamento.module';
+import { VotacaoModule } from '../votacao/votacao.module';
+import { IniciativasFacade } from './application/iniciativas.facade';
+import type { EventosPort } from './application/ports/eventos.port';
+import type { GoogleAgendaPort } from './application/ports/google-agenda.port';
+import type { IniciativaLeituraPort } from './application/ports/iniciativa-leitura.port';
+import type { SugestoesPort } from './application/ports/sugestoes.port';
+import type { UsuariosPort } from './application/ports/usuarios.port';
+import type { VotosPort } from './application/ports/votos.port';
+import { ConsultasIniciativas } from './application/queries/consultas-iniciativas';
+import { AlterarDatasIniciativa } from './application/use-cases/alterar-datas-iniciativa';
+import { AlterarIniciativa } from './application/use-cases/alterar-iniciativa';
+import { AplicarPrazosVencidos } from './application/use-cases/aplicar-prazos-vencidos';
+import { CarregarComPrazos } from './application/use-cases/carregar-com-prazos';
+import { DecidirIniciativa } from './application/use-cases/decidir-iniciativa';
+import { EditarIniciativa } from './application/use-cases/editar-iniciativa';
+import { RessubmeterIniciativa } from './application/use-cases/ressubmeter-iniciativa';
+import { SubmeterIniciativa } from './application/use-cases/submeter-iniciativa';
+import {
+  AlterarTipo,
+  CadastrarTipo,
+  ExcluirTipo,
+  ListarTipos,
+} from './application/use-cases/tipos-iniciativa';
+import type { IniciativaRepository } from './domain/ports/iniciativa.repository';
+import type { PrazosConfig } from './domain/ports/prazos-config';
+import type { TipoRepository } from './domain/ports/tipo.repository';
+import { EventosAdapter } from './infrastructure/adapters/eventos.adapter';
+import { GoogleAgendaAdapter } from './infrastructure/adapters/google-agenda.adapter';
+import { SugestoesAdapter } from './infrastructure/adapters/sugestoes.adapter';
+import { UsuariosAdapter } from './infrastructure/adapters/usuarios.adapter';
+import { VotosAdapter } from './infrastructure/adapters/votos.adapter';
+import { prazosDaConfiguracao } from './infrastructure/config/prazos.provider';
+import { IniciativaListagemQuery } from './infrastructure/persistence/iniciativa-listagem.query';
+import { PrismaIniciativaRepository } from './infrastructure/persistence/prisma-iniciativa.repository';
+import { PrismaTipoRepository } from './infrastructure/persistence/prisma-tipo.repository';
+import { TransicoesJob } from './infrastructure/scheduler/transicoes.job';
+import {
+  EVENTOS_PORT,
+  GOOGLE_AGENDA_PORT,
+  INICIATIVA_LEITURA,
+  INICIATIVA_REPOSITORY,
+  PRAZOS_CONFIG,
+  SUGESTOES_PORT,
+  TIPO_REPOSITORY,
+  TRANSACAO_PORT,
+  USUARIOS_PORT,
+  VOTOS_PORT,
+} from './iniciativas.tokens';
+import { IniciativasController } from './presentation/http/iniciativas.controller';
+import { TiposIniciativaController } from './presentation/http/tipos-iniciativa.controller';
+
+@Module({
+  imports: [
+    IdentidadeModule,
+    forwardRef(() => RefinamentoModule),
+    forwardRef(() => VotacaoModule),
+    forwardRef(() => DivulgacaoModule),
+  ],
+  controllers: [IniciativasController, TiposIniciativaController],
+  providers: [
+    { provide: INICIATIVA_REPOSITORY, useClass: PrismaIniciativaRepository },
+    { provide: INICIATIVA_LEITURA, useClass: IniciativaListagemQuery },
+    { provide: TIPO_REPOSITORY, useClass: PrismaTipoRepository },
+    { provide: USUARIOS_PORT, useClass: UsuariosAdapter },
+    { provide: SUGESTOES_PORT, useClass: SugestoesAdapter },
+    { provide: VOTOS_PORT, useClass: VotosAdapter },
+    { provide: GOOGLE_AGENDA_PORT, useClass: GoogleAgendaAdapter },
+    { provide: TRANSACAO_PORT, useClass: TransacaoAdapter },
+    { provide: EVENTOS_PORT, useClass: EventosAdapter },
+    { provide: PRAZOS_CONFIG, useFactory: prazosDaConfiguracao, inject: [ConfigService] },
+    {
+      provide: CarregarComPrazos,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
+        clock: Clock,
+        prazos: PrazosConfig,
+      ) => new CarregarComPrazos(repositorio, transacao, eventos, clock, prazos),
+      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CLOCK, PRAZOS_CONFIG],
+    },
+    {
+      provide: SubmeterIniciativa,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
+        clock: Clock,
+        prazos: PrazosConfig,
+        tipos: TipoRepository,
+      ) => new SubmeterIniciativa(repositorio, transacao, eventos, clock, prazos, tipos),
+      inject: [
+        INICIATIVA_REPOSITORY,
+        TRANSACAO_PORT,
+        EVENTOS_PORT,
+        CLOCK,
+        PRAZOS_CONFIG,
+        TIPO_REPOSITORY,
+      ],
+    },
+    {
+      provide: AlterarIniciativa,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
+        carregar: CarregarComPrazos,
+      ) => new AlterarIniciativa(repositorio, transacao, eventos, carregar),
+      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CarregarComPrazos],
+    },
+    {
+      provide: EditarIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock, tipos: TipoRepository) =>
+        new EditarIniciativa(alterar, clock, tipos),
+      inject: [AlterarIniciativa, CLOCK, TIPO_REPOSITORY],
+    },
+    {
+      provide: RessubmeterIniciativa,
+      useFactory: (
+        alterar: AlterarIniciativa,
+        clock: Clock,
+        prazos: PrazosConfig,
+        tipos: TipoRepository,
+      ) => new RessubmeterIniciativa(alterar, clock, prazos, tipos),
+      inject: [AlterarIniciativa, CLOCK, PRAZOS_CONFIG, TIPO_REPOSITORY],
+    },
+    {
+      provide: DecidirIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new DecidirIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
+    },
+    {
+      provide: ListarTipos,
+      useFactory: (tipos: TipoRepository) => new ListarTipos(tipos),
+      inject: [TIPO_REPOSITORY],
+    },
+    {
+      provide: CadastrarTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new CadastrarTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: AlterarTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new AlterarTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: ExcluirTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new ExcluirTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: AlterarDatasIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new AlterarDatasIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
+    },
+    {
+      provide: ConsultasIniciativas,
+      useFactory: (
+        leitura: IniciativaLeituraPort,
+        usuarios: UsuariosPort,
+        sugestoes: SugestoesPort,
+        votos: VotosPort,
+        googleAgenda: GoogleAgendaPort,
+        carregar: CarregarComPrazos,
+        clock: Clock,
+      ) =>
+        new ConsultasIniciativas({
+          leitura,
+          usuarios,
+          sugestoes,
+          votos,
+          googleAgenda,
+          carregar,
+          clock,
+        }),
+      inject: [
+        INICIATIVA_LEITURA,
+        USUARIOS_PORT,
+        SUGESTOES_PORT,
+        VOTOS_PORT,
+        GOOGLE_AGENDA_PORT,
+        CarregarComPrazos,
+        CLOCK,
+      ],
+    },
+    {
+      provide: AplicarPrazosVencidos,
+      useFactory: (repositorio: IniciativaRepository, carregar: CarregarComPrazos, clock: Clock) =>
+        new AplicarPrazosVencidos(repositorio, carregar, clock),
+      inject: [INICIATIVA_REPOSITORY, CarregarComPrazos, CLOCK],
+    },
+    {
+      provide: IniciativasFacade,
+      useFactory: (
+        submeter: SubmeterIniciativa,
+        editar: EditarIniciativa,
+        ressubmeter: RessubmeterIniciativa,
+        decidir: DecidirIniciativa,
+        consultas: ConsultasIniciativas,
+        carregar: CarregarComPrazos,
+        job: AplicarPrazosVencidos,
+        alterarDatas: AlterarDatasIniciativa,
+      ) =>
+        new IniciativasFacade(
+          submeter,
+          editar,
+          ressubmeter,
+          decidir,
+          consultas,
+          carregar,
+          job,
+          alterarDatas,
+        ),
+      inject: [
+        SubmeterIniciativa,
+        EditarIniciativa,
+        RessubmeterIniciativa,
+        DecidirIniciativa,
+        ConsultasIniciativas,
+        CarregarComPrazos,
+        AplicarPrazosVencidos,
+        AlterarDatasIniciativa,
+      ],
+    },
+    TransicoesJob,
+  ],
+  exports: [IniciativasFacade, TransicoesJob],
+})
+export class IniciativasModule {}
+
+// ===== src/modules/refinamento/application/refinamento.facade.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type {
+  ComentarioRepository,
+  ParIniciativaCiclo,
+} from '../domain/ports/comentario.repository';
+import type { ComentarioDto, PaginaDeComentariosDto } from './dto/comentario.dto';
+import type { AutoresPort } from './ports/autores.port';
+import type { IniciativaPort } from './ports/iniciativa.port';
+import { ContarSugestoes } from './queries/contar-sugestoes';
+import { ListarComentarios } from './queries/listar-comentarios';
+import { ComentarIniciativa } from './use-cases/comentar-iniciativa';
+
+export type { ComentarioDto, PaginaDeComentariosDto, ParIniciativaCiclo };
+
+/** API pública do módulo `refinamento`. */
+export class RefinamentoFacade {
+  private readonly comentarIniciativa: ComentarIniciativa;
+  private readonly listarComentarios: ListarComentarios;
+  private readonly contarSugestoesUseCase: ContarSugestoes;
+
+  constructor(
+    comentarios: ComentarioRepository,
+    iniciativas: IniciativaPort,
+    autores: AutoresPort,
+    clock: Clock,
+  ) {
+    this.comentarIniciativa = new ComentarIniciativa(comentarios, iniciativas, autores, clock);
+    this.listarComentarios = new ListarComentarios(comentarios, iniciativas, autores);
+    this.contarSugestoesUseCase = new ContarSugestoes(comentarios);
+  }
+
+  /** RN-05. Erros: `nao_encontrado`, `conflito` (fora de Em andamento), `validacao`. */
+  comentar(input: {
+    iniciativaId: string;
+    autorId: string;
+    texto: string;
+  }): Promise<ComentarioDto> {
+    return this.comentarIniciativa.executar(input);
+  }
+
+  listar(input: {
+    iniciativaId: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PaginaDeComentariosDto> {
+    return this.listarComentarios.executar(input);
+  }
+
+  /**
+   * Quantidade de sugestões de cada `(iniciativa, ciclo)`. Chave do mapa = `iniciativaId`;
+   * ausente = 0. Usada por `iniciativas` para `sugestoesCicloAtual`.
+   */
+  contarSugestoes(pares: ParIniciativaCiclo[]): Promise<Map<string, number>> {
+    return this.contarSugestoesUseCase.executar(pares);
+  }
+}
+
+// ===== src/modules/refinamento/refinamento.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IdentidadeModule } from '@/modules/identidade/identidade.module';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import type { Clock } from '@/shared/domain/clock';
+import { CLOCK } from '@/shared/shared.tokens';
+import type { AutoresPort } from './application/ports/autores.port';
+import type { IniciativaPort } from './application/ports/iniciativa.port';
+import { RefinamentoFacade } from './application/refinamento.facade';
+import type { ComentarioRepository } from './domain/ports/comentario.repository';
+import { AutoresAdapter } from './infrastructure/adapters/autores.adapter';
+import { IniciativaAdapter } from './infrastructure/adapters/iniciativa.adapter';
+import { PrismaComentarioRepository } from './infrastructure/persistence/prisma-comentario.repository';
+import { ComentariosController } from './presentation/http/comentarios.controller';
+import { AUTORES_PORT, COMENTARIO_REPOSITORY, INICIATIVA_PORT } from './refinamento.tokens';
+
+@Module({
+  imports: [forwardRef(() => IniciativasModule), IdentidadeModule],
+  controllers: [ComentariosController],
+  providers: [
+    { provide: COMENTARIO_REPOSITORY, useClass: PrismaComentarioRepository },
+    { provide: INICIATIVA_PORT, useClass: IniciativaAdapter },
+    { provide: AUTORES_PORT, useClass: AutoresAdapter },
+    {
+      provide: RefinamentoFacade,
+      useFactory: (
+        comentarios: ComentarioRepository,
+        iniciativas: IniciativaPort,
+        autores: AutoresPort,
+        clock: Clock,
+      ) => new RefinamentoFacade(comentarios, iniciativas, autores, clock),
+      inject: [COMENTARIO_REPOSITORY, INICIATIVA_PORT, AUTORES_PORT, CLOCK],
+    },
+  ],
+  exports: [RefinamentoFacade],
+})
+export class RefinamentoModule {}
+
+// ===== src/modules/votacao/application/votacao.facade.ts =====
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import type {
+  ParIniciativaCiclo,
+  Placar,
+  VotacaoRepository,
+} from '../domain/ports/votacao.repository';
+import type { MeuVoto } from '../domain/voto';
+import type { IniciativaPort } from './ports/iniciativa.port';
+import {
+  RegistrarVoto,
+  type RegistrarVotoInput,
+  type ResultadoVotoDto,
+} from './use-cases/registrar-voto';
+
+export type { MeuVoto, ParIniciativaCiclo, Placar, RegistrarVotoInput, ResultadoVotoDto };
+
+const SEM_VOTOS: Placar = { likes: 0, dislikes: 0, relevancia: 0 };
+
+/** API pública do módulo `votacao`. */
+export class VotacaoFacade {
+  private readonly registrarVoto: RegistrarVoto;
+
+  constructor(
+    private readonly votacao: VotacaoRepository,
+    iniciativas: IniciativaPort,
+    transacao: TransacaoPort,
+  ) {
+    this.registrarVoto = new RegistrarVoto(votacao, iniciativas, transacao);
+  }
+
+  /** RN-07. Erros: `nao_encontrado`, `conflito` (fora de Em votação), `validacao`. */
+  votar(input: RegistrarVotoInput): Promise<ResultadoVotoDto> {
+    return this.registrarVoto.executar(input);
+  }
+
+  /** Placar do ciclo. Zeros se não houver linha. */
+  async placar(iniciativaId: string, ciclo: number): Promise<Placar> {
+    return (await this.votacao.buscarPlacar(iniciativaId, ciclo)) ?? { ...SEM_VOTOS };
+  }
+
+  /** Placares em lote. Chave = `iniciativaId`; ausente = sem votos (zeros). */
+  placares(pares: ParIniciativaCiclo[]): Promise<Map<string, Placar>> {
+    if (pares.length === 0) return Promise.resolve(new Map());
+    return this.votacao.buscarPlacares(pares);
+  }
+
+  /** Voto do usuário no ciclo: 1, -1 ou 0. */
+  meuVoto(iniciativaId: string, ciclo: number, usuarioId: string): Promise<MeuVoto> {
+    return this.votacao.buscarVoto(iniciativaId, ciclo, usuarioId);
+  }
+}
+
+// ===== src/modules/votacao/votacao.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { IniciativasModule } from '@/modules/iniciativas/iniciativas.module';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import { TransacaoAdapter } from '@/shared/infrastructure/transacao.adapter';
+import type { IniciativaPort } from './application/ports/iniciativa.port';
+import { VotacaoFacade } from './application/votacao.facade';
+import type { VotacaoRepository } from './domain/ports/votacao.repository';
+import { IniciativaAdapter } from './infrastructure/adapters/iniciativa.adapter';
+import { PrismaVotacaoRepository } from './infrastructure/persistence/prisma-votacao.repository';
+import { VotoController } from './presentation/http/voto.controller';
+import { INICIATIVA_PORT, TRANSACAO_PORT, VOTACAO_REPOSITORY } from './votacao.tokens';
+
+@Module({
+  imports: [forwardRef(() => IniciativasModule)],
+  controllers: [VotoController],
+  providers: [
+    { provide: VOTACAO_REPOSITORY, useClass: PrismaVotacaoRepository },
+    { provide: INICIATIVA_PORT, useClass: IniciativaAdapter },
+    { provide: TRANSACAO_PORT, useClass: TransacaoAdapter },
+    {
+      provide: VotacaoFacade,
+      useFactory: (
+        votacao: VotacaoRepository,
+        iniciativas: IniciativaPort,
+        transacao: TransacaoPort,
+      ) => new VotacaoFacade(votacao, iniciativas, transacao),
+      inject: [VOTACAO_REPOSITORY, INICIATIVA_PORT, TRANSACAO_PORT],
+    },
+  ],
+  exports: [VotacaoFacade],
+})
+export class VotacaoModule {}
+
+
+// ===== Dependências entre módulos (imports @/modules/<outro>) =====
+avaliacao -> iniciativas  (src/modules/avaliacao/avaliacao.module.ts)
+avaliacao -> iniciativas  (src/modules/avaliacao/infrastructure/adapters/iniciativas-facade.adapter.ts)
+divulgacao -> iniciativas  (src/modules/divulgacao/divulgacao.module.ts)
+divulgacao -> iniciativas  (src/modules/divulgacao/infrastructure/adapters/iniciativas-facade.adapter.ts)
+iniciativas -> divulgacao  (src/modules/iniciativas/infrastructure/adapters/google-agenda.adapter.ts)
+iniciativas -> identidade  (src/modules/iniciativas/infrastructure/adapters/usuarios.adapter.ts)
+iniciativas -> refinamento  (src/modules/iniciativas/infrastructure/adapters/sugestoes.adapter.ts)
+iniciativas -> votacao  (src/modules/iniciativas/infrastructure/adapters/votos.adapter.ts)
+refinamento -> identidade  (src/modules/refinamento/infrastructure/adapters/autores.adapter.ts)
+refinamento -> identidade  (src/modules/refinamento/refinamento.module.ts)
+refinamento -> iniciativas  (src/modules/refinamento/infrastructure/adapters/iniciativa.adapter.ts)
+refinamento -> iniciativas  (src/modules/refinamento/refinamento.module.ts)
+votacao -> iniciativas  (src/modules/votacao/infrastructure/adapters/iniciativa.adapter.ts)
+votacao -> iniciativas  (src/modules/votacao/votacao.module.ts)

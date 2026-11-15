@@ -1,0 +1,384 @@
+Contexto do módulo identidade (src/modules/identidade, sem testes e sem a pasta testing)
+Commit: b1352d3
+Arquivos (13, 355 linhas):
+- src/modules/identidade/application/dto/usuario.dto.ts
+- src/modules/identidade/application/identidade.facade.ts
+- src/modules/identidade/application/queries/obter-usuarios.ts
+- src/modules/identidade/application/use-cases/registrar-usuario.ts
+- src/modules/identidade/domain/errors/identidade.errors.ts
+- src/modules/identidade/domain/perfil.ts
+- src/modules/identidade/domain/ports/usuario.repository.ts
+- src/modules/identidade/domain/usuario.ts
+- src/modules/identidade/identidade.module.ts
+- src/modules/identidade/infrastructure/persistence/prisma-usuario.repository.ts
+- src/modules/identidade/presentation/http/me.controller.ts
+- src/modules/identidade/presentation/http/me.dto.ts
+- src/modules/identidade/presentation/http/usuario-sync.guard.ts
+
+// ===== src/modules/identidade/application/dto/usuario.dto.ts =====
+import type { Perfil } from '../../domain/perfil';
+
+export interface UsuarioDto {
+  id: string;
+  nome: string;
+  perfil: Perfil;
+}
+
+export interface RegistrarUsuarioInput {
+  id: string;
+  nome: string;
+  perfil: string;
+}
+
+// ===== src/modules/identidade/application/identidade.facade.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { UsuarioRepository } from '../domain/ports/usuario.repository';
+import type { RegistrarUsuarioInput, UsuarioDto } from './dto/usuario.dto';
+import { ObterUsuario, ObterUsuarios } from './queries/obter-usuarios';
+import { RegistrarUsuario } from './use-cases/registrar-usuario';
+
+export type { RegistrarUsuarioInput, UsuarioDto };
+
+// Limite do cache de sincronização: evita crescer sem controle em instâncias longevas.
+const LIMITE_CACHE = 5000;
+// Enquanto nome e perfil não mudam, o usuário só é regravado a cada 5 minutos.
+const TTL_CACHE_MS = 5 * 60 * 1000;
+
+interface Sincronizacao {
+  assinatura: string;
+  ate: number;
+}
+
+/**
+ * API pública do módulo `identidade`. Os outros módulos só falam com `identidade`
+ * por aqui, e sempre por portas implementadas em `infrastructure/adapters`.
+ */
+export class IdentidadeFacade {
+  private readonly registrarUsuario: RegistrarUsuario;
+  private readonly obterUsuario: ObterUsuario;
+  private readonly obterUsuarios: ObterUsuarios;
+  /** id → última gravação (assinatura "nome|perfil" e validade), para não escrever a cada requisição. */
+  private readonly sincronizados = new Map<string, Sincronizacao>();
+
+  constructor(
+    usuarios: UsuarioRepository,
+    private readonly clock: Clock,
+  ) {
+    this.registrarUsuario = new RegistrarUsuario(usuarios);
+    this.obterUsuario = new ObterUsuario(usuarios);
+    this.obterUsuarios = new ObterUsuarios(usuarios);
+  }
+
+  /**
+   * Garante que o usuário do token existe localmente com nome e perfil atuais. Grava
+   * quando algo mudou desde o último registro desta instância ou quando o cache de 5
+   * minutos expirou.
+   */
+  async garantirUsuario(input: RegistrarUsuarioInput): Promise<void> {
+    const assinatura = `${input.nome}|${input.perfil}`;
+    const agora = this.clock.now().getTime();
+    const anterior = this.sincronizados.get(input.id);
+    if (anterior && anterior.assinatura === assinatura && anterior.ate > agora) {
+      return;
+    }
+    await this.registrarUsuario.executar(input);
+    if (this.sincronizados.size >= LIMITE_CACHE) {
+      this.sincronizados.clear();
+    }
+    this.sincronizados.set(input.id, { assinatura, ate: agora + TTL_CACHE_MS });
+  }
+
+  obterPorId(id: string): Promise<UsuarioDto> {
+    return this.obterUsuario.executar(id);
+  }
+
+  usuariosPorIds(ids: string[]): Promise<UsuarioDto[]> {
+    return this.obterUsuarios.executar(ids);
+  }
+
+  /** Mapa id → usuário, para exibir autores, comentaristas e decisores. */
+  async mapaPorIds(ids: string[]): Promise<Map<string, UsuarioDto>> {
+    const usuarios = await this.obterUsuarios.executar(ids);
+    return new Map(usuarios.map((usuario) => [usuario.id, usuario]));
+  }
+}
+
+// ===== src/modules/identidade/application/queries/obter-usuarios.ts =====
+import { UsuarioNaoEncontradoError } from '../../domain/errors/identidade.errors';
+import type { UsuarioRepository } from '../../domain/ports/usuario.repository';
+import type { Usuario } from '../../domain/usuario';
+import type { UsuarioDto } from '../dto/usuario.dto';
+
+const paraDto = (usuario: Usuario): UsuarioDto => ({
+  id: usuario.id,
+  nome: usuario.nome,
+  perfil: usuario.perfil,
+});
+
+export class ObterUsuario {
+  constructor(private readonly usuarios: UsuarioRepository) {}
+
+  async executar(id: string): Promise<UsuarioDto> {
+    const usuario = await this.usuarios.buscarPorId(id);
+    if (!usuario) {
+      throw new UsuarioNaoEncontradoError(id);
+    }
+    return paraDto(usuario);
+  }
+}
+
+export class ObterUsuarios {
+  constructor(private readonly usuarios: UsuarioRepository) {}
+
+  async executar(ids: string[]): Promise<UsuarioDto[]> {
+    const unicos = [...new Set(ids)];
+    if (unicos.length === 0) {
+      return [];
+    }
+    return (await this.usuarios.buscarPorIds(unicos)).map(paraDto);
+  }
+}
+
+// ===== src/modules/identidade/application/use-cases/registrar-usuario.ts =====
+import type { UsuarioRepository } from '../../domain/ports/usuario.repository';
+import { Usuario } from '../../domain/usuario';
+import type { RegistrarUsuarioInput } from '../dto/usuario.dto';
+
+/** Cria ou atualiza a projeção local do usuário a partir do que veio no token. */
+export class RegistrarUsuario {
+  constructor(private readonly usuarios: UsuarioRepository) {}
+
+  async executar(input: RegistrarUsuarioInput): Promise<void> {
+    const usuario = Usuario.criar(input);
+    await this.usuarios.salvar(usuario);
+  }
+}
+
+// ===== src/modules/identidade/domain/errors/identidade.errors.ts =====
+import { DomainError } from '@/shared/domain/domain-error';
+
+export class UsuarioInvalidoError extends DomainError {
+  readonly code = 'USUARIO_INVALIDO';
+  readonly tipo = 'validacao' as const;
+
+  constructor(motivo: string) {
+    super(`Usuário inválido: ${motivo}`);
+  }
+}
+
+export class UsuarioNaoEncontradoError extends DomainError {
+  readonly code = 'USUARIO_NAO_ENCONTRADO';
+  readonly tipo = 'nao_encontrado' as const;
+
+  constructor(readonly id: string) {
+    super(`Usuário "${id}" não encontrado.`);
+  }
+}
+
+// ===== src/modules/identidade/domain/perfil.ts =====
+export const PERFIS = ['ALUNO', 'PROFESSOR', 'COMITE', 'ADMIN'] as const;
+
+export type Perfil = (typeof PERFIS)[number];
+
+export function ehPerfil(valor: string): valor is Perfil {
+  return (PERFIS as readonly string[]).includes(valor);
+}
+
+// ===== src/modules/identidade/domain/ports/usuario.repository.ts =====
+import type { Usuario } from '../usuario';
+
+export interface UsuarioRepository {
+  /** Cria o usuário ou atualiza nome e perfil (upsert por id). */
+  salvar(usuario: Usuario): Promise<void>;
+  buscarPorId(id: string): Promise<Usuario | null>;
+  buscarPorIds(ids: string[]): Promise<Usuario[]>;
+}
+
+// ===== src/modules/identidade/domain/usuario.ts =====
+import { UsuarioInvalidoError } from './errors/identidade.errors';
+import { ehPerfil, type Perfil } from './perfil';
+
+/**
+ * Projeção local do usuário do Keycloak: só o necessário para exibir nomes e
+ * perfis (RNF-01). Nunca guarda e-mail nem contato.
+ */
+export class Usuario {
+  private constructor(
+    readonly id: string,
+    readonly nome: string,
+    readonly perfil: Perfil,
+  ) {}
+
+  static criar(props: { id: string; nome: string; perfil: string }): Usuario {
+    const id = props.id?.trim();
+    if (!id) {
+      throw new UsuarioInvalidoError('identificador ausente.');
+    }
+    const nome = props.nome?.trim();
+    if (!nome) {
+      throw new UsuarioInvalidoError('nome ausente.');
+    }
+    if (!ehPerfil(props.perfil)) {
+      throw new UsuarioInvalidoError(`perfil "${props.perfil}" desconhecido.`);
+    }
+    return new Usuario(id, nome, props.perfil);
+  }
+
+  equals(outro: Usuario): boolean {
+    return this.id === outro.id && this.nome === outro.nome && this.perfil === outro.perfil;
+  }
+}
+
+// ===== src/modules/identidade/identidade.module.ts =====
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import type { Clock } from '@/shared/domain/clock';
+import { CLOCK } from '@/shared/shared.tokens';
+import { IdentidadeFacade } from './application/identidade.facade';
+import { PrismaUsuarioRepository } from './infrastructure/persistence/prisma-usuario.repository';
+import { MeController } from './presentation/http/me.controller';
+import { UsuarioSyncGuard } from './presentation/http/usuario-sync.guard';
+
+@Module({
+  controllers: [MeController],
+  providers: [
+    PrismaUsuarioRepository,
+    {
+      provide: IdentidadeFacade,
+      useFactory: (usuarios: PrismaUsuarioRepository, clock: Clock) =>
+        new IdentidadeFacade(usuarios, clock),
+      inject: [PrismaUsuarioRepository, CLOCK],
+    },
+    // Deve ser registrado depois do AuthModule (ordem de import no AppModule).
+    { provide: APP_GUARD, useClass: UsuarioSyncGuard },
+  ],
+  exports: [IdentidadeFacade],
+})
+export class IdentidadeModule {}
+
+// ===== src/modules/identidade/infrastructure/persistence/prisma-usuario.repository.ts =====
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '@/database/prisma.service';
+import type { UsuarioRepository } from '../../domain/ports/usuario.repository';
+import { Usuario } from '../../domain/usuario';
+
+type UsuarioComPerfil = { id: string; nome: string; perfil: { code: string } };
+
+const paraDominio = (row: UsuarioComPerfil): Usuario =>
+  Usuario.criar({ id: row.id, nome: row.nome, perfil: row.perfil.code });
+
+@Injectable()
+export class PrismaUsuarioRepository implements UsuarioRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async salvar(usuario: Usuario): Promise<void> {
+    const perfil = { connect: { code: usuario.perfil } };
+    await this.prisma.usuario.upsert({
+      where: { id: usuario.id },
+      create: { id: usuario.id, nome: usuario.nome, perfil },
+      update: { nome: usuario.nome, perfil, atualizadoEm: new Date() },
+    });
+  }
+
+  async buscarPorId(id: string): Promise<Usuario | null> {
+    const row = await this.prisma.usuario.findUnique({
+      where: { id },
+      include: { perfil: true },
+    });
+    return row ? paraDominio(row) : null;
+  }
+
+  async buscarPorIds(ids: string[]): Promise<Usuario[]> {
+    const rows = await this.prisma.usuario.findMany({
+      where: { id: { in: ids } },
+      include: { perfil: true },
+    });
+    return rows.map(paraDominio);
+  }
+}
+
+// ===== src/modules/identidade/presentation/http/me.controller.ts =====
+import { Controller, Get } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AccessRole } from '@/common/auth/access-role.enum';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { IdentidadeFacade } from '../../application/identidade.facade';
+import { MeResponseDto } from './me.dto';
+
+@ApiTags('Identidade')
+@ApiBearerAuth()
+@Controller({ path: 'me', version: '1' })
+export class MeController {
+  constructor(
+    private readonly identidade: IdentidadeFacade,
+    private readonly config: ConfigService,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Retorna o usuário autenticado, o perfil e os prazos configurados' })
+  @ApiOkResponse({ type: MeResponseDto })
+  async me(@GetCurrentUser() user: CurrentUser): Promise<MeResponseDto> {
+    const usuario = await this.identidade.obterPorId(user.userId);
+    return {
+      id: usuario.id,
+      nome: usuario.nome,
+      perfil: usuario.perfil,
+      ehComite: user.roles.includes(AccessRole.COMITE) || user.roles.includes(AccessRole.ADMIN),
+      prazos: {
+        refinamentoDias: this.config.getOrThrow<number>('prazos.refinamentoDias'),
+        votacaoDias: this.config.getOrThrow<number>('prazos.votacaoDias'),
+      },
+    };
+  }
+}
+
+// ===== src/modules/identidade/presentation/http/me.dto.ts =====
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { PERFIS } from '../../domain/perfil';
+
+export const MeResponseSchema = z.object({
+  id: z.string().describe('Identificador do usuário (sub do token)'),
+  nome: z.string().describe('Nome para exibição'),
+  perfil: z.enum(PERFIS).describe('Perfil de exibição: ALUNO, PROFESSOR, COMITE ou ADMIN'),
+  ehComite: z
+    .boolean()
+    .describe('Pode ver a fila de análise e decidir (membro do comitê ou administrador)'),
+  prazos: z
+    .object({
+      refinamentoDias: z.number().describe('Dias de refinamento (sugestões)'),
+      votacaoDias: z.number().describe('Dias de votação'),
+    })
+    .describe('Prazos configurados, usados nos textos da tela'),
+});
+
+export class MeResponseDto extends createZodDto(MeResponseSchema) {}
+
+// ===== src/modules/identidade/presentation/http/usuario-sync.guard.ts =====
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import type { Request } from 'express';
+import { IdentidadeFacade } from '../../application/identidade.facade';
+
+/**
+ * Roda depois do `AuthGuard`: toda requisição autenticada garante que o usuário do
+ * token exista localmente (id, nome, perfil). Assim qualquer módulo pode exibir
+ * nomes de autores e comentaristas sem depender de o usuário ter chamado `GET /me`.
+ */
+@Injectable()
+export class UsuarioSyncGuard implements CanActivate {
+  constructor(private readonly identidade: IdentidadeFacade) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const user = context.switchToHttp().getRequest<Request>().user;
+    if (user) {
+      await this.identidade.garantirUsuario({
+        id: user.userId,
+        nome: user.nome,
+        perfil: user.perfil,
+      });
+    }
+    return true;
+  }
+}
