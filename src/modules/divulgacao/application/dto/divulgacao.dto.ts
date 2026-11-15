@@ -1,4 +1,4 @@
-import type { Periodicidade, TipoIniciativa } from '../../domain/periodicidade';
+import type { Periodicidade, TipoIniciativa } from '@/shared/domain/vocabulario-iniciativa';
 
 export type { Periodicidade, TipoIniciativa };
 

@@ -1,19 +1,21 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { LIMITE_PADRAO_COMENTARIOS } from '../../application/dto/comentario.dto';
+import { TEXTO_MAXIMO } from '../../domain/comentario';
 
 const MENSAGEM_TEXTO = 'Escreva sua sugestão antes de enviar.';
 
 export const CriarComentarioSchema = z.object({
   texto: z
     .string({ required_error: MENSAGEM_TEXTO, invalid_type_error: MENSAGEM_TEXTO })
-    .describe('Texto da sugestão (1 a 1000 caracteres após remover espaços nas pontas)'),
+    .describe(`Texto da sugestão (1 a ${TEXTO_MAXIMO} caracteres após remover espaços nas pontas)`),
 });
 
 export class CriarComentarioDto extends createZodDto(CriarComentarioSchema) {}
 
 export const ListarComentariosQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(500).default(50),
+  limit: z.coerce.number().int().min(1).max(500).default(LIMITE_PADRAO_COMENTARIOS),
 });
 
 export class ListarComentariosQueryDto extends createZodDto(ListarComentariosQuerySchema) {}

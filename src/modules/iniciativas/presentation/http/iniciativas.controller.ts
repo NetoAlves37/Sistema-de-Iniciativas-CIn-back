@@ -52,6 +52,11 @@ export class IniciativasController {
     status: 422,
     description: 'Campos inválidos (RN-01 e RN-02), com `errors` por campo',
   })
+  @ApiResponse({
+    status: 409,
+    description:
+      'O autor já tem uma iniciativa ativa com o mesmo título, data e horário de início (INICIATIVA_DUPLICADA)',
+  })
   async submeter(@Body() corpo: DadosIniciativaDto, @GetCurrentUser() user: CurrentUser) {
     const id = await this.iniciativas.submeter(user.userId, corpo as DadosIniciativaInput);
     return this.iniciativas.detalhe(id, atorDe(user));

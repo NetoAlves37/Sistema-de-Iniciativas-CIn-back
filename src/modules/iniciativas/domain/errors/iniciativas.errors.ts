@@ -91,6 +91,19 @@ export class ConcorrenciaError extends DomainError {
   }
 }
 
+/**
+ * O autor já tem uma iniciativa ativa com o mesmo título, a mesma data de início e o mesmo
+ * horário de início (409). Evita a mesma submissão repetida, inclusive por duplo clique.
+ */
+export class IniciativaDuplicadaError extends DomainError {
+  readonly code = 'INICIATIVA_DUPLICADA';
+  readonly tipo = 'conflito' as const;
+
+  constructor() {
+    super('Você já submeteu uma iniciativa com este título, nesta data e neste horário.');
+  }
+}
+
 export class TipoNaoEncontradoError extends DomainError {
   readonly code = 'TIPO_NAO_ENCONTRADO';
   readonly tipo = 'nao_encontrado' as const;

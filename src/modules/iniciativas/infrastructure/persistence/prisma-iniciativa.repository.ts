@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { Periodicidade, TipoIniciativa } from '@/shared/domain/vocabulario-iniciativa';
 import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
 import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
 import { Iniciativa, type IniciativaProps } from '../../domain/iniciativa';
-import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
-import type { StatusIniciativa } from '../../domain/status';
-import type { Periodicidade, TipoIniciativa } from '../../domain/tipos';
+import type {
+  FiltroDuplicidade,
+  IniciativaRepository,
+} from '../../domain/ports/iniciativa.repository';
+import { STATUS_ATIVOS, type StatusIniciativa } from '../../domain/status';
 import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
 
 type LinhaIniciativa = Prisma.IniciativaGetPayload<{
@@ -119,6 +122,25 @@ export class PrismaIniciativaRepository implements IniciativaRepository {
     }
     await this.gravarHistorico(iniciativa);
     iniciativa.confirmarGravacao();
+  }
+
+  async existeAtivaIgual(filtro: FiltroDuplicidade): Promise<boolean> {
+    // Trava as submissões deste autor até o fim da transação: dois envios simultâneos (duplo
+    // clique) passam um de cada vez, e o segundo já enxerga o primeiro. Lock consultivo, para
+    // não depender da tabela de usuários, que é de outro módulo.
+    await this.host.client
+      .$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`submissao:${filtro.autorId}`}))`;
+    const igual = await this.host.client.iniciativa.findFirst({
+      where: {
+        autorId: filtro.autorId,
+        titulo: { equals: filtro.titulo, mode: 'insensitive' },
+        inicio: new Date(filtro.inicio),
+        horaInicio: filtro.horaInicio,
+        status: { code: { in: [...STATUS_ATIVOS] } },
+      },
+      select: { id: true },
+    });
+    return igual !== null;
   }
 
   async idsComPrazoVencido(agora: Date, limite: number): Promise<string[]> {

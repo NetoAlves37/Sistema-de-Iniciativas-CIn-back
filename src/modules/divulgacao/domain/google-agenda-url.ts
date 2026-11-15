@@ -1,5 +1,5 @@
+import type { Periodicidade } from '@/shared/domain/vocabulario-iniciativa';
 import { somarDias } from './datas';
-import type { Periodicidade } from './periodicidade';
 
 export interface DadosGoogleAgenda {
   titulo: string;

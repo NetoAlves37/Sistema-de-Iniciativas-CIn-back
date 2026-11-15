@@ -1,0 +1,3591 @@
+Contexto do módulo iniciativas (src/modules/iniciativas, sem testes e sem a pasta testing)
+Commit: b1352d3
+Arquivos (45, 3498 linhas):
+- src/modules/iniciativas/application/dto/iniciativa.dto.ts
+- src/modules/iniciativas/application/dto/tipo.dto.ts
+- src/modules/iniciativas/application/iniciativas.facade.ts
+- src/modules/iniciativas/application/ports/eventos.port.ts
+- src/modules/iniciativas/application/ports/google-agenda.port.ts
+- src/modules/iniciativas/application/ports/iniciativa-leitura.port.ts
+- src/modules/iniciativas/application/ports/sugestoes.port.ts
+- src/modules/iniciativas/application/ports/usuarios.port.ts
+- src/modules/iniciativas/application/ports/votos.port.ts
+- src/modules/iniciativas/application/queries/consultas-iniciativas.ts
+- src/modules/iniciativas/application/use-cases/alterar-datas-iniciativa.ts
+- src/modules/iniciativas/application/use-cases/alterar-iniciativa.ts
+- src/modules/iniciativas/application/use-cases/aplicar-prazos-vencidos.ts
+- src/modules/iniciativas/application/use-cases/carregar-com-prazos.ts
+- src/modules/iniciativas/application/use-cases/decidir-iniciativa.ts
+- src/modules/iniciativas/application/use-cases/editar-iniciativa.ts
+- src/modules/iniciativas/application/use-cases/ressubmeter-iniciativa.ts
+- src/modules/iniciativas/application/use-cases/submeter-iniciativa.ts
+- src/modules/iniciativas/application/use-cases/tipos-iniciativa.ts
+- src/modules/iniciativas/domain/errors/iniciativas.errors.ts
+- src/modules/iniciativas/domain/events/iniciativa.events.ts
+- src/modules/iniciativas/domain/iniciativa.ts
+- src/modules/iniciativas/domain/ports/iniciativa.repository.ts
+- src/modules/iniciativas/domain/ports/prazos-config.ts
+- src/modules/iniciativas/domain/ports/tipo.repository.ts
+- src/modules/iniciativas/domain/status.ts
+- src/modules/iniciativas/domain/tipo-de-iniciativa.ts
+- src/modules/iniciativas/domain/tipos.ts
+- src/modules/iniciativas/domain/value-objects/dados-iniciativa.ts
+- src/modules/iniciativas/infrastructure/adapters/eventos.adapter.ts
+- src/modules/iniciativas/infrastructure/adapters/google-agenda.adapter.ts
+- src/modules/iniciativas/infrastructure/adapters/sugestoes.adapter.ts
+- src/modules/iniciativas/infrastructure/adapters/usuarios.adapter.ts
+- src/modules/iniciativas/infrastructure/adapters/votos.adapter.ts
+- src/modules/iniciativas/infrastructure/config/prazos.provider.ts
+- src/modules/iniciativas/infrastructure/persistence/iniciativa-listagem.query.ts
+- src/modules/iniciativas/infrastructure/persistence/prisma-iniciativa.repository.ts
+- src/modules/iniciativas/infrastructure/persistence/prisma-tipo.repository.ts
+- src/modules/iniciativas/infrastructure/scheduler/transicoes.job.ts
+- src/modules/iniciativas/iniciativas.module.ts
+- src/modules/iniciativas/iniciativas.tokens.ts
+- src/modules/iniciativas/presentation/http/iniciativas.controller.ts
+- src/modules/iniciativas/presentation/http/iniciativas.dto.ts
+- src/modules/iniciativas/presentation/http/tipos-iniciativa.controller.ts
+- src/modules/iniciativas/presentation/http/tipos-iniciativa.dto.ts
+
+// ===== src/modules/iniciativas/application/dto/iniciativa.dto.ts =====
+import type { StatusIniciativa } from '../../domain/status';
+import type { Periodicidade, TipoIniciativa } from '../../domain/tipos';
+
+export type { Periodicidade, StatusIniciativa, TipoIniciativa };
+
+export type PerfilExibicao = 'ALUNO' | 'PROFESSOR' | 'COMITE' | 'ADMIN';
+
+export interface AutorDto {
+  id: string;
+  nome: string;
+  perfil: PerfilExibicao;
+}
+
+export interface VotosDto {
+  likes: number;
+  dislikes: number;
+  relevancia: number;
+}
+
+/** Item das listas (home, minhas, fila, aprovadas). Datas como string ISO. */
+export interface ResumoIniciativaDto {
+  id: string;
+  tipo: TipoIniciativa;
+  titulo: string;
+  resumo: string;
+  autor: AutorDto;
+  status: StatusIniciativa;
+  comVotacao: boolean;
+  ciclo: number;
+  fimRefinamento: string | null;
+  fimVotacao: string | null;
+  /** Prazo que importa agora: `fimRefinamento` em Em andamento, `fimVotacao` em Em votação. */
+  prazoAtual: string | null;
+  votos: VotosDto;
+  sugestoesCicloAtual: number;
+  /** `YYYY-MM-DD` */
+  inicio: string;
+  fim: string;
+  periodicidade: Periodicidade;
+  espaco: string;
+  criadaEm: string;
+  /** Instante da decisão do comitê (aprovada ou reprovada); null nos demais status. */
+  decididaEm: string | null;
+}
+
+export interface PermissoesDto {
+  podeEditar: boolean;
+  podeComentar: boolean;
+  podeVotar: boolean;
+  podeDecidir: boolean;
+  /** Preenchida quando o usuário é do comitê, a iniciativa está em análise e ele não pode decidir. */
+  motivoNaoPodeDecidir?: string;
+  podeRessubmeter: boolean;
+}
+
+export interface DecisaoDto {
+  resultado: 'APROVADA' | 'REPROVADA';
+  justificativa: string | null;
+  decisor: { nome: string };
+  decididaEm: string;
+}
+
+export interface DetalheIniciativaDto extends ResumoIniciativaDto {
+  detalhe: string;
+  /** `HH:mm` ou null (dia inteiro). */
+  horaInicio: string | null;
+  horaFim: string | null;
+  organizadores: string;
+  membros: string | null;
+  participantes: number;
+  /** 1 (like), -1 (dislike) ou 0 (sem voto), no ciclo atual. */
+  meuVoto: 1 | -1 | 0;
+  permissoes: PermissoesDto;
+  decisao: DecisaoDto | null;
+  /** Justificativa da última reprovação, para a tela de ressubmissão. */
+  ultimaJustificativa: string | null;
+  /** Só para iniciativas aprovadas. */
+  googleAgendaUrl: string | null;
+}
+
+export interface TransicaoDto {
+  id: string;
+  ciclo: number;
+  de: StatusIniciativa | null;
+  para: StatusIniciativa;
+  /** Nome do usuário, ou `Sistema`. */
+  por: string;
+  nota: string;
+  justificativa: string | null;
+  ocorreuEm: string;
+}
+
+/** Campos de entrada de uma iniciativa (RN-01 e RN-02), como chegam do HTTP. */
+export interface DadosIniciativaInput {
+  tipo: string;
+  titulo: string;
+  resumo: string;
+  detalhe: string;
+  inicio: string;
+  fim: string;
+  horaInicio?: string | null;
+  horaFim?: string | null;
+  periodicidade: string;
+  espaco: string;
+  organizadores: string;
+  membros?: string | null;
+  participantes: number;
+  comVotacao?: boolean;
+}
+
+export type OrdenacaoListagem = 'relevancia' | 'prazo' | 'recentes' | 'inicio';
+
+export interface FiltroListagemDto {
+  status?: StatusIniciativa;
+  tipo?: TipoIniciativa;
+  /** Busca case-insensitive em título, resumo, organizadores e espaço. */
+  q?: string;
+  autorId?: string;
+  ordenar?: OrdenacaoListagem;
+  page: number;
+  limit: number;
+}
+
+export interface PaginaDto<T> {
+  items: T[];
+  total: number;
+}
+
+/** Ator de uma operação: quem está pedindo e se pode agir como comitê. */
+/** Corpo de `PATCH /iniciativas/:id/datas`: só datas e horários (validados no domínio). */
+export interface DatasIniciativaInput {
+  inicio?: string;
+  fim?: string;
+  horaInicio?: string | null;
+  horaFim?: string | null;
+}
+
+export interface AtorDto {
+  id: string;
+  nome: string;
+  /** Membro do comitê ou administrador: pode ver a fila e decidir. */
+  ehComite: boolean;
+}
+
+/** O que os outros módulos precisam saber do estado de uma iniciativa. */
+export interface EstadoIniciativaDto {
+  id: string;
+  autorId: string;
+  status: StatusIniciativa;
+  ciclo: number;
+  comVotacao: boolean;
+  fimRefinamento: string | null;
+  fimVotacao: string | null;
+}
+
+/** Dados de uma iniciativa aprovada, para gerar ocorrências do calendário (RN-12). */
+export interface AprovadaParaCalendarioDto {
+  id: string;
+  titulo: string;
+  tipo: TipoIniciativa;
+  resumo: string;
+  /** `YYYY-MM-DD` */
+  inicio: string;
+  fim: string;
+  horaInicio: string | null;
+  horaFim: string | null;
+  periodicidade: Periodicidade;
+  espaco: string;
+  organizadores: string;
+  autorId: string;
+}
+
+// ===== src/modules/iniciativas/application/dto/tipo.dto.ts =====
+/** Um tipo de iniciativa do cadastro (`GET /tipos-iniciativa`). */
+export interface TipoIniciativaDto {
+  id: number;
+  /** Código estável, usado nas iniciativas e nos filtros (por exemplo `PALESTRA`). */
+  code: string;
+  nome: string;
+  /** `#RRGGBB` */
+  cor: string;
+  ativo: boolean;
+  /** Quantas iniciativas usam o tipo. Com alguma, ele não pode ser excluído. */
+  iniciativas: number;
+}
+
+/** Corpo de `POST /tipos-iniciativa`. Validado no domínio (422 por campo). */
+export interface CadastrarTipoInput {
+  nome?: string;
+  cor?: string;
+}
+
+/** Corpo de `PATCH /tipos-iniciativa/:id`: só os campos que mudam. */
+export interface AlterarTipoInput {
+  nome?: string;
+  cor?: string;
+  ativo?: boolean;
+}
+
+/** Quem faz a ação: precisa ser do comitê ou ADMIN; o nome vai para o log. */
+export interface AtorTipoDto {
+  id: string;
+  nome: string;
+  ehComite: boolean;
+}
+
+// ===== src/modules/iniciativas/application/iniciativas.facade.ts =====
+import type { StatusIniciativa } from '../domain/status';
+import type {
+  AprovadaParaCalendarioDto,
+  AtorDto,
+  DadosIniciativaInput,
+  DatasIniciativaInput,
+  DetalheIniciativaDto,
+  EstadoIniciativaDto,
+  FiltroListagemDto,
+  PaginaDto,
+  ResumoIniciativaDto,
+  TipoIniciativa,
+  TransicaoDto,
+} from './dto/iniciativa.dto';
+import type { ConsultasIniciativas } from './queries/consultas-iniciativas';
+import type { AlterarDatasIniciativa } from './use-cases/alterar-datas-iniciativa';
+import type { AplicarPrazosVencidos } from './use-cases/aplicar-prazos-vencidos';
+import type { CarregarComPrazos } from './use-cases/carregar-com-prazos';
+import type { DecidirIniciativa } from './use-cases/decidir-iniciativa';
+import type { EditarIniciativa } from './use-cases/editar-iniciativa';
+import type { RessubmeterIniciativa } from './use-cases/ressubmeter-iniciativa';
+import type { SubmeterIniciativa } from './use-cases/submeter-iniciativa';
+
+export type * from './dto/iniciativa.dto';
+
+export interface RegistrarDecisaoInput {
+  iniciativaId: string;
+  resultado: 'APROVADA' | 'REPROVADA';
+  justificativa?: string | null;
+  /** Quem decide. O autor da iniciativa nunca pode decidir sobre ela (RN-10). */
+  decisorId: string;
+}
+
+export interface FiltroCalendarioInput {
+  /** Início do intervalo, `YYYY-MM-DD` (inclusivo). */
+  de: string;
+  /** Fim do intervalo, `YYYY-MM-DD` (exclusivo). */
+  ate: string;
+  tipos?: TipoIniciativa[];
+  /** Só as iniciativas deste autor. */
+  autorId?: string;
+}
+
+/**
+ * API pública do módulo `iniciativas`. Os outros módulos só falam com ele por aqui, e
+ * sempre por portas implementadas em `infrastructure/adapters` do módulo consumidor.
+ * É o único módulo que muda o status de uma iniciativa.
+ */
+export class IniciativasFacade {
+  constructor(
+    private readonly submeterIniciativa: SubmeterIniciativa,
+    private readonly editarIniciativa: EditarIniciativa,
+    private readonly ressubmeterIniciativa: RessubmeterIniciativa,
+    private readonly decidirIniciativa: DecidirIniciativa,
+    private readonly consultas: ConsultasIniciativas,
+    private readonly carregar: CarregarComPrazos,
+    private readonly job: AplicarPrazosVencidos,
+    private readonly alterarDatasIniciativa: AlterarDatasIniciativa,
+  ) {}
+
+  // --- contrato usado pelos outros módulos --------------------------------------------------
+
+  /**
+   * Estado da iniciativa para validar operações de outros módulos (votar, comentar).
+   * Aplica antes as transições por prazo vencidas (RN-06). `null` se não existir.
+   */
+  async obterEstado(iniciativaId: string): Promise<EstadoIniciativaDto | null> {
+    const iniciativa = await this.carregar.executar(iniciativaId);
+    if (!iniciativa) return null;
+    return {
+      id: iniciativa.id,
+      autorId: iniciativa.autorId,
+      status: iniciativa.status,
+      ciclo: iniciativa.ciclo,
+      comVotacao: iniciativa.comVotacao,
+      fimRefinamento: iniciativa.fimRefinamento?.toISOString() ?? null,
+      fimVotacao: iniciativa.fimVotacao?.toISOString() ?? null,
+    };
+  }
+
+  /**
+   * Registra a decisão do comitê (RN-10). Lança erros de domínio: `proibido` se o decisor
+   * é o autor, `conflito` fora de Em análise ou se já foi decidida, `nao_encontrado` se
+   * não existir. A validação da justificativa fica no caso de uso de `avaliacao`.
+   */
+  registrarDecisao(input: RegistrarDecisaoInput): Promise<void> {
+    return this.decidirIniciativa.executar(
+      input.iniciativaId,
+      input.decisorId,
+      input.resultado,
+      input.justificativa,
+    );
+  }
+
+  /** Listagem paginada de resumos, com filtros e ordenação no banco (RNF-05). */
+  listar(filtro: FiltroListagemDto): Promise<PaginaDto<ResumoIniciativaDto>> {
+    return this.consultas.listar(filtro);
+  }
+
+  /** Detalhe com permissões calculadas para o ator. Lança `nao_encontrado`. */
+  detalhe(iniciativaId: string, ator: AtorDto): Promise<DetalheIniciativaDto> {
+    return this.consultas.detalhe(iniciativaId, ator);
+  }
+
+  /** Iniciativas aprovadas cujo período pode cruzar o intervalo, para gerar ocorrências. */
+  aprovadasParaCalendario(filtro: FiltroCalendarioInput): Promise<AprovadaParaCalendarioDto[]> {
+    return this.consultas.aprovadasParaCalendario(filtro);
+  }
+
+  // --- usado pelos controllers e pelo job do próprio módulo ---------------------------------
+
+  submeter(autorId: string, entrada: DadosIniciativaInput): Promise<string> {
+    return this.submeterIniciativa.executar(autorId, entrada);
+  }
+
+  editar(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
+    return this.editarIniciativa.executar(id, usuarioId, entrada);
+  }
+
+  ressubmeter(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
+    return this.ressubmeterIniciativa.executar(id, usuarioId, entrada);
+  }
+
+  /** Comitê ou ADMIN muda datas e horários de uma aprovada (a série inteira). */
+  alterarDatas(id: string, ator: AtorDto, datas: DatasIniciativaInput): Promise<void> {
+    return this.alterarDatasIniciativa.executar(id, ator, datas);
+  }
+
+  minhas(autorId: string, filtro: { status?: StatusIniciativa; page: number; limit: number }) {
+    return this.consultas.minhas(autorId, filtro);
+  }
+
+  contagens(): Promise<{ emAnalise: number }> {
+    return this.consultas.contagens();
+  }
+
+  historico(iniciativaId: string): Promise<TransicaoDto[]> {
+    return this.consultas.historico(iniciativaId);
+  }
+
+  /** Aplica as transições por prazo vencidas (job). Devolve quantas iniciativas processou. */
+  aplicarPrazosVencidos(): Promise<number> {
+    return this.job.executar();
+  }
+}
+
+// ===== src/modules/iniciativas/application/ports/eventos.port.ts =====
+import type { DomainEvent } from '@/shared/domain/domain-event';
+
+/** Publica eventos de domínio (adapter sobre o `DomainEventPublisher`). */
+export interface EventosPort {
+  publicar(eventos: DomainEvent[]): void;
+}
+
+// ===== src/modules/iniciativas/application/ports/google-agenda.port.ts =====
+export interface DadosGoogleAgenda {
+  titulo: string;
+  resumo: string;
+  inicio: string;
+  fim: string;
+  horaInicio: string | null;
+  horaFim: string | null;
+  periodicidade: string;
+  espaco: string;
+  organizadores: string;
+}
+
+/** Link do Google Agenda de uma aprovada (implementada com o módulo `divulgacao`). */
+export interface GoogleAgendaPort {
+  url(dados: DadosGoogleAgenda): string;
+}
+
+// ===== src/modules/iniciativas/application/ports/iniciativa-leitura.port.ts =====
+import type { Periodicidade, StatusIniciativa, TipoIniciativa } from '../dto/iniciativa.dto';
+
+/** Linha de leitura de uma iniciativa, já com o placar do ciclo atual. */
+export interface LinhaResumo {
+  id: string;
+  autorId: string;
+  tipo: TipoIniciativa;
+  titulo: string;
+  resumo: string;
+  status: StatusIniciativa;
+  comVotacao: boolean;
+  ciclo: number;
+  fimRefinamento: Date | null;
+  fimVotacao: Date | null;
+  /** `YYYY-MM-DD` */
+  inicio: string;
+  fim: string;
+  periodicidade: Periodicidade;
+  espaco: string;
+  criadaEm: Date;
+  decididaEm: Date | null;
+  likes: number;
+  dislikes: number;
+  relevancia: number;
+}
+
+export interface LinhaDetalhe extends LinhaResumo {
+  detalhe: string;
+  horaInicio: string | null;
+  horaFim: string | null;
+  organizadores: string;
+  membros: string | null;
+  participantes: number;
+  decisorId: string | null;
+  justificativa: string | null;
+}
+
+export interface LinhaHistorico {
+  id: string;
+  ciclo: number;
+  de: StatusIniciativa | null;
+  para: StatusIniciativa;
+  por: string;
+  nota: string;
+  justificativa: string | null;
+  ocorreuEm: Date;
+}
+
+export interface LinhaCalendario {
+  id: string;
+  titulo: string;
+  tipo: TipoIniciativa;
+  resumo: string;
+  inicio: string;
+  fim: string;
+  horaInicio: string | null;
+  horaFim: string | null;
+  periodicidade: Periodicidade;
+  espaco: string;
+  organizadores: string;
+  autorId: string;
+}
+
+export interface FiltroLeitura {
+  status?: StatusIniciativa;
+  tipo?: TipoIniciativa;
+  q?: string;
+  autorId?: string;
+  ordenar: 'relevancia' | 'prazo' | 'recentes' | 'inicio';
+  page: number;
+  limit: number;
+}
+
+/**
+ * Modelo de leitura das iniciativas (listagens com filtros, ordenação e paginação no
+ * banco, RNF-05). A implementação junta o placar de votos para ordenar por relevância.
+ */
+export interface IniciativaLeituraPort {
+  listar(filtro: FiltroLeitura): Promise<{ linhas: LinhaResumo[]; total: number }>;
+  contagemPorStatus(autorId: string): Promise<Partial<Record<StatusIniciativa, number>>>;
+  contarPorStatus(status: StatusIniciativa): Promise<number>;
+  obterLinha(id: string): Promise<LinhaDetalhe | null>;
+  historico(id: string): Promise<LinhaHistorico[]>;
+  aprovadasParaCalendario(filtro: {
+    de: string;
+    ate: string;
+    tipos?: TipoIniciativa[];
+    autorId?: string;
+  }): Promise<LinhaCalendario[]>;
+}
+
+// ===== src/modules/iniciativas/application/ports/sugestoes.port.ts =====
+/** Contagem de sugestões (comentários) do ciclo (implementada com o módulo `refinamento`). */
+export interface SugestoesPort {
+  /** Chave do mapa = `iniciativaId`; ausente = 0. */
+  contar(pares: Array<{ iniciativaId: string; ciclo: number }>): Promise<Map<string, number>>;
+}
+
+// ===== src/modules/iniciativas/application/ports/usuarios.port.ts =====
+export interface UsuarioResumo {
+  id: string;
+  nome: string;
+  perfil: 'ALUNO' | 'PROFESSOR' | 'COMITE' | 'ADMIN';
+}
+
+/** Nomes e perfis de autores e decisores (implementada com o módulo `identidade`). */
+export interface UsuariosPort {
+  mapaPorIds(ids: string[]): Promise<Map<string, UsuarioResumo>>;
+}
+
+// ===== src/modules/iniciativas/application/ports/votos.port.ts =====
+/** Voto do usuário (implementada com o módulo `votacao`). */
+export interface VotosPort {
+  /** 1 (like), -1 (dislike) ou 0 (sem voto), no ciclo informado. */
+  meuVoto(iniciativaId: string, ciclo: number, usuarioId: string): Promise<1 | -1 | 0>;
+}
+
+// ===== src/modules/iniciativas/application/queries/consultas-iniciativas.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import { IniciativaNaoEncontradaError } from '../../domain/errors/iniciativas.errors';
+import type { StatusIniciativa } from '../../domain/status';
+import type {
+  AprovadaParaCalendarioDto,
+  AtorDto,
+  AutorDto,
+  DetalheIniciativaDto,
+  FiltroListagemDto,
+  PaginaDto,
+  ResumoIniciativaDto,
+  TipoIniciativa,
+  TransicaoDto,
+} from '../dto/iniciativa.dto';
+import type { GoogleAgendaPort } from '../ports/google-agenda.port';
+import type {
+  IniciativaLeituraPort,
+  LinhaDetalhe,
+  LinhaResumo,
+} from '../ports/iniciativa-leitura.port';
+import type { SugestoesPort } from '../ports/sugestoes.port';
+import type { UsuarioResumo, UsuariosPort } from '../ports/usuarios.port';
+import type { VotosPort } from '../ports/votos.port';
+import type { CarregarComPrazos } from '../use-cases/carregar-com-prazos';
+
+const iso = (data: Date | null): string | null => (data ? data.toISOString() : null);
+
+const NOME_DESCONHECIDO = 'Membro da comunidade';
+
+function autorDe(id: string, usuarios: Map<string, UsuarioResumo>): AutorDto {
+  const usuario = usuarios.get(id);
+  return {
+    id,
+    nome: usuario?.nome ?? NOME_DESCONHECIDO,
+    perfil: usuario?.perfil ?? 'ALUNO',
+  };
+}
+
+function prazoAtual(linha: LinhaResumo): Date | null {
+  if (linha.status === 'EM_ANDAMENTO') return linha.fimRefinamento;
+  if (linha.status === 'EM_VOTACAO') return linha.fimVotacao;
+  return null;
+}
+
+function paraResumo(
+  linha: LinhaResumo,
+  usuarios: Map<string, UsuarioResumo>,
+  sugestoes: Map<string, number>,
+): ResumoIniciativaDto {
+  return {
+    id: linha.id,
+    tipo: linha.tipo,
+    titulo: linha.titulo,
+    resumo: linha.resumo,
+    autor: autorDe(linha.autorId, usuarios),
+    status: linha.status,
+    comVotacao: linha.comVotacao,
+    ciclo: linha.ciclo,
+    fimRefinamento: iso(linha.fimRefinamento),
+    fimVotacao: iso(linha.fimVotacao),
+    prazoAtual: iso(prazoAtual(linha)),
+    votos: { likes: linha.likes, dislikes: linha.dislikes, relevancia: linha.relevancia },
+    sugestoesCicloAtual: sugestoes.get(linha.id) ?? 0,
+    inicio: linha.inicio,
+    fim: linha.fim,
+    periodicidade: linha.periodicidade,
+    espaco: linha.espaco,
+    criadaEm: linha.criadaEm.toISOString(),
+    decididaEm: iso(linha.decididaEm),
+  };
+}
+
+interface DepsConsultas {
+  leitura: IniciativaLeituraPort;
+  usuarios: UsuariosPort;
+  sugestoes: SugestoesPort;
+  votos: VotosPort;
+  googleAgenda: GoogleAgendaPort;
+  carregar: CarregarComPrazos;
+  clock: Clock;
+}
+
+/** Casos de uso de leitura de `iniciativas` (listas, detalhe, histórico, calendário). */
+export class ConsultasIniciativas {
+  constructor(private readonly deps: DepsConsultas) {}
+
+  /** RNF-05: filtros, ordenação e paginação no banco. */
+  async listar(filtro: FiltroListagemDto): Promise<PaginaDto<ResumoIniciativaDto>> {
+    const { linhas, total } = await this.deps.leitura.listar({
+      status: filtro.status,
+      tipo: filtro.tipo,
+      q: filtro.q?.trim() || undefined,
+      autorId: filtro.autorId,
+      ordenar: filtro.ordenar ?? 'recentes',
+      page: filtro.page,
+      limit: filtro.limit,
+    });
+    return { items: await this.resumos(linhas), total };
+  }
+
+  /** Minhas iniciativas, com a contagem por status (todas, sem o filtro de status). */
+  async minhas(
+    autorId: string,
+    filtro: { status?: StatusIniciativa; page: number; limit: number },
+  ): Promise<
+    PaginaDto<ResumoIniciativaDto> & {
+      contagemPorStatus: Partial<Record<StatusIniciativa, number>>;
+    }
+  > {
+    const [pagina, contagemPorStatus] = await Promise.all([
+      this.listar({ ...filtro, autorId, ordenar: 'recentes' }),
+      this.deps.leitura.contagemPorStatus(autorId),
+    ]);
+    return { ...pagina, contagemPorStatus };
+  }
+
+  async contagens(): Promise<{ emAnalise: number }> {
+    return { emAnalise: await this.deps.leitura.contarPorStatus('EM_ANALISE') };
+  }
+
+  /** Detalhe com permissões calculadas no domínio. Aplica antes os prazos vencidos (RN-06). */
+  async detalhe(id: string, ator: AtorDto): Promise<DetalheIniciativaDto> {
+    const { carregar, leitura, usuarios, sugestoes, votos, googleAgenda, clock } = this.deps;
+    const iniciativa = await carregar.executar(id);
+    if (!iniciativa) throw new IniciativaNaoEncontradaError();
+    const linha = await leitura.obterLinha(id);
+    if (!linha) throw new IniciativaNaoEncontradaError();
+
+    const ids = [linha.autorId, ...(linha.decisorId ? [linha.decisorId] : [])];
+    const [mapaUsuarios, mapaSugestoes, meuVoto, ultimaJustificativa] = await Promise.all([
+      usuarios.mapaPorIds(ids),
+      sugestoes.contar([{ iniciativaId: linha.id, ciclo: linha.ciclo }]),
+      votos.meuVoto(linha.id, linha.ciclo, ator.id),
+      this.ultimaJustificativa(linha),
+    ]);
+
+    const decidida = linha.status === 'APROVADA' || linha.status === 'REPROVADA';
+    return {
+      ...paraResumo(linha, mapaUsuarios, mapaSugestoes),
+      detalhe: linha.detalhe,
+      horaInicio: linha.horaInicio,
+      horaFim: linha.horaFim,
+      organizadores: linha.organizadores,
+      membros: linha.membros,
+      participantes: linha.participantes,
+      meuVoto,
+      permissoes: iniciativa.permissoesPara(ator, clock),
+      decisao:
+        decidida && linha.decisorId && linha.decididaEm
+          ? {
+              resultado: linha.status as 'APROVADA' | 'REPROVADA',
+              justificativa: linha.status === 'REPROVADA' ? linha.justificativa : null,
+              decisor: { nome: autorDe(linha.decisorId, mapaUsuarios).nome },
+              decididaEm: linha.decididaEm.toISOString(),
+            }
+          : null,
+      ultimaJustificativa,
+      googleAgendaUrl:
+        linha.status === 'APROVADA'
+          ? googleAgenda.url({
+              titulo: linha.titulo,
+              resumo: linha.resumo,
+              inicio: linha.inicio,
+              fim: linha.fim,
+              horaInicio: linha.horaInicio,
+              horaFim: linha.horaFim,
+              periodicidade: linha.periodicidade,
+              espaco: linha.espaco,
+              organizadores: linha.organizadores,
+            })
+          : null,
+    };
+  }
+
+  /** Histórico de transições, do mais recente para o mais antigo. */
+  async historico(id: string): Promise<TransicaoDto[]> {
+    const { leitura, usuarios } = this.deps;
+    if (!(await leitura.obterLinha(id))) throw new IniciativaNaoEncontradaError();
+    const linhas = await leitura.historico(id);
+    const mapa = await usuarios.mapaPorIds(
+      linhas.map((l) => l.por).filter((por) => por !== 'SISTEMA'),
+    );
+    // O banco devolve em ordem cronológica (instante e ordem de gravação); inverte para o mais recente primeiro.
+    return linhas
+      .map((l) => ({
+        id: l.id,
+        ciclo: l.ciclo,
+        de: l.de,
+        para: l.para,
+        por: l.por === 'SISTEMA' ? 'Sistema' : (mapa.get(l.por)?.nome ?? NOME_DESCONHECIDO),
+        nota: l.nota,
+        justificativa: l.justificativa,
+        ocorreuEm: l.ocorreuEm.toISOString(),
+      }))
+      .reverse();
+  }
+
+  async aprovadasParaCalendario(filtro: {
+    de: string;
+    ate: string;
+    tipos?: TipoIniciativa[];
+    autorId?: string;
+  }): Promise<AprovadaParaCalendarioDto[]> {
+    return this.deps.leitura.aprovadasParaCalendario(filtro);
+  }
+
+  // --- interno ---------------------------------------------------------------------------
+
+  private async resumos(linhas: LinhaResumo[]): Promise<ResumoIniciativaDto[]> {
+    if (linhas.length === 0) return [];
+    const { usuarios, sugestoes } = this.deps;
+    const [mapaUsuarios, mapaSugestoes] = await Promise.all([
+      usuarios.mapaPorIds(linhas.map((l) => l.autorId)),
+      sugestoes.contar(linhas.map((l) => ({ iniciativaId: l.id, ciclo: l.ciclo }))),
+    ]);
+    return linhas.map((linha) => paraResumo(linha, mapaUsuarios, mapaSugestoes));
+  }
+
+  /** Justificativa da última reprovação (também depois da ressubmissão, para a tela de edição). */
+  private async ultimaJustificativa(linha: LinhaDetalhe): Promise<string | null> {
+    if (linha.status === 'REPROVADA') return linha.justificativa;
+    if (linha.ciclo <= 1) return null;
+    const historico = await this.deps.leitura.historico(linha.id);
+    const reprovacoes = historico.filter((h) => h.para === 'REPROVADA' && h.justificativa);
+    reprovacoes.sort((a, b) => b.ocorreuEm.getTime() - a.ocorreuEm.getTime());
+    return reprovacoes[0]?.justificativa ?? null;
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/alterar-datas-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { AtorDto, DatasIniciativaInput } from '../dto/iniciativa.dto';
+import type { AlterarIniciativa } from './alterar-iniciativa';
+
+/** Comitê ou ADMIN altera datas e horários de uma aprovada (a série inteira). */
+export class AlterarDatasIniciativa {
+  constructor(
+    private readonly alterar: AlterarIniciativa,
+    private readonly clock: Clock,
+  ) {}
+
+  async executar(id: string, ator: AtorDto, datas: DatasIniciativaInput): Promise<void> {
+    await this.alterar.executar(id, (iniciativa) =>
+      iniciativa.alterarDatas(datas, { id: ator.id, ehComite: ator.ehComite }, this.clock),
+    );
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/alterar-iniciativa.ts =====
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import { IniciativaNaoEncontradaError } from '../../domain/errors/iniciativas.errors';
+import type { Iniciativa } from '../../domain/iniciativa';
+import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
+import type { EventosPort } from '../ports/eventos.port';
+import type { CarregarComPrazos } from './carregar-com-prazos';
+
+/**
+ * Passo comum dos casos de uso que alteram uma iniciativa existente (editar, ressubmeter e
+ * decidir): carrega aplicando prazos, executa a mudança e grava em transação, publicando os
+ * eventos.
+ */
+export class AlterarIniciativa {
+  constructor(
+    private readonly repositorio: IniciativaRepository,
+    private readonly transacao: TransacaoPort,
+    private readonly eventos: EventosPort,
+    private readonly carregar: CarregarComPrazos,
+  ) {}
+
+  async executar(id: string, mudar: (iniciativa: Iniciativa) => void): Promise<void> {
+    const iniciativa = await this.carregar.executar(id);
+    if (!iniciativa) throw new IniciativaNaoEncontradaError();
+    mudar(iniciativa);
+    await this.transacao.run(() => this.repositorio.salvar(iniciativa));
+    this.eventos.publicar(iniciativa.pullEvents());
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/aplicar-prazos-vencidos.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
+import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
+import type { CarregarComPrazos } from './carregar-com-prazos';
+
+const TAMANHO_DO_LOTE = 100;
+
+/**
+ * Job de transições (RN-06): busca as iniciativas com prazo vencido, em lotes de 100, e
+ * aplica as transições de cada uma. Idempotente e seguro com várias instâncias: o
+ * `ConcorrenciaError` de quem perdeu a corrida é ignorado, porque outra instância já
+ * processou aquela iniciativa.
+ */
+export class AplicarPrazosVencidos {
+  constructor(
+    private readonly repositorio: IniciativaRepository,
+    private readonly carregar: CarregarComPrazos,
+    private readonly clock: Clock,
+  ) {}
+
+  /** Devolve quantas iniciativas foram processadas. */
+  async executar(): Promise<number> {
+    let processadas = 0;
+    const jaVistas = new Set<string>();
+    for (;;) {
+      const ids = (
+        await this.repositorio.idsComPrazoVencido(this.clock.now(), TAMANHO_DO_LOTE)
+      ).filter((id) => !jaVistas.has(id));
+      if (ids.length === 0) return processadas;
+      for (const id of ids) {
+        jaVistas.add(id);
+        try {
+          await this.carregar.executar(id);
+          processadas++;
+        } catch (erro) {
+          if (!(erro instanceof ConcorrenciaError)) throw erro;
+        }
+      }
+    }
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/carregar-com-prazos.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
+import type { Iniciativa } from '../../domain/iniciativa';
+import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
+import type { PrazosConfig } from '../../domain/ports/prazos-config';
+import type { EventosPort } from '../ports/eventos.port';
+
+const TENTATIVAS = 3;
+
+/**
+ * Carrega uma iniciativa aplicando antes as transições por prazo vencidas (RN-06). É o
+ * ponto único usado por todo caso de uso que depende de status (editar, comentar, votar,
+ * decidir, ler detalhe): o resultado não depende do intervalo do job.
+ *
+ * A aplicação roda numa transação PRÓPRIA e confirmada, antes da operação que a pediu. Assim,
+ * se a operação falhar (por exemplo, editar depois do prazo → 409), a transição já ficou
+ * gravada (RN-04.4). Se outra instância gravar ao mesmo tempo, relê e tenta de novo.
+ */
+export class CarregarComPrazos {
+  constructor(
+    private readonly repositorio: IniciativaRepository,
+    private readonly transacao: TransacaoPort,
+    private readonly eventos: EventosPort,
+    private readonly clock: Clock,
+    private readonly prazos: PrazosConfig,
+  ) {}
+
+  async executar(id: string): Promise<Iniciativa | null> {
+    for (let tentativa = 1; ; tentativa++) {
+      try {
+        const iniciativa = await this.transacao.run(async () => {
+          const carregada = await this.repositorio.buscarPorId(id);
+          if (!carregada) return null;
+          const transicoes = carregada.aplicarPrazosVencidos(this.clock, this.prazos);
+          if (transicoes.length > 0) await this.repositorio.salvar(carregada);
+          return carregada;
+        });
+        if (iniciativa) this.eventos.publicar(iniciativa.pullEvents());
+        return iniciativa;
+      } catch (erro) {
+        if (erro instanceof ConcorrenciaError && tentativa < TENTATIVAS) continue;
+        throw erro;
+      }
+    }
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/decidir-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
+import type { AlterarIniciativa } from './alterar-iniciativa';
+
+const MENSAGEM_JA_DECIDIDA = 'Esta iniciativa já foi decidida.';
+
+/**
+ * RN-10. A segunda decisão concorrente perde na checagem de versão e recebe 409
+ * ("Esta iniciativa já foi decidida.").
+ */
+export class DecidirIniciativa {
+  constructor(
+    private readonly alterar: AlterarIniciativa,
+    private readonly clock: Clock,
+  ) {}
+
+  async executar(
+    id: string,
+    decisorId: string,
+    resultado: 'APROVADA' | 'REPROVADA',
+    justificativa: string | null | undefined,
+  ): Promise<void> {
+    try {
+      await this.alterar.executar(id, (iniciativa) =>
+        iniciativa.decidir(resultado, justificativa ?? undefined, decisorId, this.clock),
+      );
+    } catch (erro) {
+      if (erro instanceof ConcorrenciaError) throw new ConcorrenciaError(MENSAGEM_JA_DECIDIDA);
+      throw erro;
+    }
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/editar-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { TipoRepository } from '../../domain/ports/tipo.repository';
+import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
+import type { DadosIniciativaInput } from '../dto/iniciativa.dto';
+import type { AlterarIniciativa } from './alterar-iniciativa';
+
+/** RN-04. */
+export class EditarIniciativa {
+  constructor(
+    private readonly alterar: AlterarIniciativa,
+    private readonly clock: Clock,
+    private readonly tipos: Pick<TipoRepository, 'codigosAtivos'>,
+  ) {}
+
+  async executar(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
+    const ativos = await this.tipos.codigosAtivos();
+    await this.alterar.executar(id, (iniciativa) => {
+      // O tipo atual continua valendo mesmo que tenha sido desativado depois da submissão.
+      const permitidos = new Set([...ativos, iniciativa.dados.tipo]);
+      const dados = DadosIniciativa.criar(entrada, permitidos);
+      iniciativa.editar(dados, entrada.comVotacao ?? iniciativa.comVotacao, usuarioId, this.clock);
+    });
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/ressubmeter-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { PrazosConfig } from '../../domain/ports/prazos-config';
+import type { TipoRepository } from '../../domain/ports/tipo.repository';
+import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
+import type { DadosIniciativaInput } from '../dto/iniciativa.dto';
+import type { AlterarIniciativa } from './alterar-iniciativa';
+
+/** RN-11. */
+export class RessubmeterIniciativa {
+  constructor(
+    private readonly alterar: AlterarIniciativa,
+    private readonly clock: Clock,
+    private readonly prazos: PrazosConfig,
+    private readonly tipos: Pick<TipoRepository, 'codigosAtivos'>,
+  ) {}
+
+  async executar(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
+    const ativos = await this.tipos.codigosAtivos();
+    await this.alterar.executar(id, (iniciativa) => {
+      // O tipo atual continua valendo mesmo que tenha sido desativado depois da submissão.
+      const permitidos = new Set([...ativos, iniciativa.dados.tipo]);
+      const dados = DadosIniciativa.criar(entrada, permitidos);
+      iniciativa.ressubmeter(
+        dados,
+        entrada.comVotacao ?? iniciativa.comVotacao,
+        usuarioId,
+        this.clock,
+        this.prazos,
+      );
+    });
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/submeter-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import { Iniciativa } from '../../domain/iniciativa';
+import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
+import type { PrazosConfig } from '../../domain/ports/prazos-config';
+import type { TipoRepository } from '../../domain/ports/tipo.repository';
+import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
+import type { DadosIniciativaInput } from '../dto/iniciativa.dto';
+import type { EventosPort } from '../ports/eventos.port';
+
+/** RN-01 a RN-03. O tipo tem de ser um dos tipos ativos do cadastro. */
+export class SubmeterIniciativa {
+  constructor(
+    private readonly repositorio: IniciativaRepository,
+    private readonly transacao: TransacaoPort,
+    private readonly eventos: EventosPort,
+    private readonly clock: Clock,
+    private readonly prazos: PrazosConfig,
+    private readonly tipos: Pick<TipoRepository, 'codigosAtivos'>,
+  ) {}
+
+  /** Devolve o id da iniciativa criada. */
+  async executar(autorId: string, entrada: DadosIniciativaInput): Promise<string> {
+    const ativos = new Set(await this.tipos.codigosAtivos());
+    const dados = DadosIniciativa.criar(entrada, ativos);
+    const iniciativa = Iniciativa.submeter(
+      dados,
+      autorId,
+      entrada.comVotacao ?? true,
+      this.clock,
+      this.prazos,
+    );
+    await this.transacao.run(() => this.repositorio.criar(iniciativa));
+    this.eventos.publicar(iniciativa.pullEvents());
+    return iniciativa.id;
+  }
+}
+
+// ===== src/modules/iniciativas/application/use-cases/tipos-iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import { ValidacaoError } from '@/shared/domain/domain-error';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import {
+  SomenteComiteError,
+  TipoEmUsoError,
+  TipoNaoEncontradoError,
+} from '../../domain/errors/iniciativas.errors';
+import type { TipoRepository } from '../../domain/ports/tipo.repository';
+import { normalizarNome, TipoDeIniciativa } from '../../domain/tipo-de-iniciativa';
+import type {
+  AlterarTipoInput,
+  AtorTipoDto,
+  CadastrarTipoInput,
+  TipoIniciativaDto,
+} from '../dto/tipo.dto';
+
+const ACAO_CADASTRO = 'manter o cadastro de tipos de iniciativa';
+
+function exigirComite(ator: AtorTipoDto): void {
+  if (!ator.ehComite) throw new SomenteComiteError(ACAO_CADASTRO);
+}
+
+function paraDto(tipo: TipoDeIniciativa, contagem: Map<number, number>): TipoIniciativaDto {
+  return {
+    id: tipo.id,
+    code: tipo.code,
+    nome: tipo.nome,
+    cor: tipo.cor,
+    ativo: tipo.ativo,
+    iniciativas: contagem.get(tipo.id) ?? 0,
+  };
+}
+
+/** Não podem existir dois tipos com o mesmo nome (sem diferenciar acento e maiúsculas). */
+function exigirNomeLivre(nome: string, outros: TipoDeIniciativa[]): void {
+  const alvo = normalizarNome(nome);
+  if (outros.some((outro) => normalizarNome(outro.nome) === alvo)) {
+    throw new ValidacaoError({ nome: 'Já existe um tipo com este nome.' });
+  }
+}
+
+/** Todos os tipos (ativos e inativos), com a contagem de iniciativas de cada um. */
+export class ListarTipos {
+  constructor(private readonly tipos: TipoRepository) {}
+
+  async executar(filtro: { somenteAtivos?: boolean } = {}): Promise<TipoIniciativaDto[]> {
+    const [todos, contagem] = await Promise.all([
+      this.tipos.listar(),
+      this.tipos.contarIniciativas(),
+    ]);
+    const lista = filtro.somenteAtivos ? todos.filter((tipo) => tipo.ativo) : todos;
+    return lista.map((tipo) => paraDto(tipo, contagem));
+  }
+}
+
+/** Comitê ou ADMIN cadastra um tipo (nasce ativo). Registra `CRIADO` no log. */
+export class CadastrarTipo {
+  constructor(
+    private readonly tipos: TipoRepository,
+    private readonly transacao: TransacaoPort,
+    private readonly clock: Clock,
+  ) {}
+
+  async executar(ator: AtorTipoDto, entrada: CadastrarTipoInput): Promise<TipoIniciativaDto> {
+    exigirComite(ator);
+    const existentes = await this.tipos.listar();
+    const tipo = TipoDeIniciativa.criar(entrada, new Set(existentes.map((t) => t.code)));
+    exigirNomeLivre(tipo.nome, existentes);
+    const id = await this.transacao.run(() =>
+      this.tipos.criar(tipo, { id: ator.id, nome: ator.nome }, this.clock.now()),
+    );
+    return {
+      id,
+      code: tipo.code,
+      nome: tipo.nome,
+      cor: tipo.cor,
+      ativo: tipo.ativo,
+      iniciativas: 0,
+    };
+  }
+}
+
+/**
+ * Comitê ou ADMIN renomeia, troca a cor e/ou ativa e desativa um tipo, mesmo com iniciativas
+ * associadas (o código não muda). Registra no log cada mudança efetiva.
+ */
+export class AlterarTipo {
+  constructor(
+    private readonly tipos: TipoRepository,
+    private readonly transacao: TransacaoPort,
+    private readonly clock: Clock,
+  ) {}
+
+  async executar(
+    id: number,
+    ator: AtorTipoDto,
+    entrada: AlterarTipoInput,
+  ): Promise<TipoIniciativaDto> {
+    exigirComite(ator);
+    const tipo = await this.tipos.buscarPorId(id);
+    if (!tipo) throw new TipoNaoEncontradoError();
+
+    tipo.alterar({ nome: entrada.nome, cor: entrada.cor });
+    if (entrada.nome !== undefined) {
+      const outros = (await this.tipos.listar()).filter((outro) => outro.id !== tipo.id);
+      exigirNomeLivre(tipo.nome, outros);
+    }
+    if (entrada.ativo !== undefined) tipo.definirAtivo(entrada.ativo);
+
+    await this.transacao.run(() =>
+      this.tipos.salvar(tipo, { id: ator.id, nome: ator.nome }, this.clock.now()),
+    );
+    const contagem = await this.tipos.contarIniciativas();
+    return paraDto(tipo, contagem);
+  }
+}
+
+/**
+ * Comitê ou ADMIN exclui um tipo. Proibido (409) se houver iniciativas associadas, em
+ * qualquer status: nesse caso, a saída é desativar. Registra `EXCLUIDO` no log.
+ */
+export class ExcluirTipo {
+  constructor(
+    private readonly tipos: TipoRepository,
+    private readonly transacao: TransacaoPort,
+    private readonly clock: Clock,
+  ) {}
+
+  async executar(id: number, ator: AtorTipoDto): Promise<void> {
+    exigirComite(ator);
+    const tipo = await this.tipos.buscarPorId(id);
+    if (!tipo) throw new TipoNaoEncontradoError();
+    const emUso = (await this.tipos.contarIniciativas()).get(tipo.id) ?? 0;
+    if (emUso > 0) throw new TipoEmUsoError(emUso);
+    await this.transacao.run(() =>
+      this.tipos.excluir(
+        tipo,
+        tipo.registroDeExclusao(),
+        { id: ator.id, nome: ator.nome },
+        this.clock.now(),
+      ),
+    );
+  }
+}
+
+// ===== src/modules/iniciativas/domain/errors/iniciativas.errors.ts =====
+import { DomainError } from '@/shared/domain/domain-error';
+import { ROTULO_STATUS, type StatusIniciativa } from '../status';
+
+export class IniciativaNaoEncontradaError extends DomainError {
+  readonly code = 'INICIATIVA_NAO_ENCONTRADA';
+  readonly tipo = 'nao_encontrado' as const;
+
+  constructor() {
+    super('Iniciativa não encontrada.');
+  }
+}
+
+/** Só o autor edita ou ressubmete a própria iniciativa. */
+export class SomenteAutorError extends DomainError {
+  readonly code = 'SOMENTE_AUTOR';
+  readonly tipo = 'proibido' as const;
+
+  constructor(acao: 'editar' | 'ressubmeter') {
+    super(`Só o autor pode ${acao} esta iniciativa.`);
+  }
+}
+
+/** O autor não decide sobre a própria iniciativa (RN-10: conflito de interesse). */
+export class AutorNaoPodeDecidirError extends DomainError {
+  readonly code = 'AUTOR_NAO_PODE_DECIDIR';
+  readonly tipo = 'proibido' as const;
+
+  constructor() {
+    super(
+      'Você é o autor desta iniciativa e não pode registrar a decisão. Outro membro do comitê deve fazê-lo.',
+    );
+  }
+}
+
+/** Só o comitê (ou o ADMIN) altera as datas de uma iniciativa aprovada. */
+export class SomenteComiteError extends DomainError {
+  readonly code = 'SOMENTE_COMITE';
+  readonly tipo = 'proibido' as const;
+
+  constructor(acao = 'alterar as datas desta iniciativa') {
+    super(`Só o comitê ou um administrador pode ${acao}.`);
+  }
+}
+
+export type OperacaoDeEstado =
+  | 'editar'
+  | 'alterarDatas'
+  | 'ressubmeter'
+  | 'decidir'
+  | 'encerrarRefinamento'
+  | 'encerrarVotacao';
+
+/** A operação não é permitida no status atual da iniciativa (409). */
+export class TransicaoInvalidaError extends DomainError {
+  readonly code = 'TRANSICAO_INVALIDA';
+  readonly tipo = 'conflito' as const;
+
+  constructor(
+    readonly status: StatusIniciativa,
+    readonly operacao: OperacaoDeEstado,
+  ) {
+    super(TransicaoInvalidaError.mensagem(status, operacao));
+  }
+
+  private static mensagem(status: StatusIniciativa, operacao: OperacaoDeEstado): string {
+    const rotulo = ROTULO_STATUS[status];
+    switch (operacao) {
+      case 'editar':
+        return `Iniciativas com status "${rotulo}" não podem ser editadas.`;
+      case 'ressubmeter':
+        return `Iniciativas com status "${rotulo}" não podem ser ressubmetidas.`;
+      case 'decidir':
+        return status === 'APROVADA' || status === 'REPROVADA'
+          ? 'Esta iniciativa já foi decidida.'
+          : 'Esta iniciativa ainda não está em análise.';
+      case 'alterarDatas':
+        return 'Só iniciativas aprovadas podem ter as datas alteradas.';
+      default:
+        return `Operação inválida para iniciativas com status "${rotulo}".`;
+    }
+  }
+}
+
+/** Outra gravação mudou a iniciativa entre a leitura e a escrita (concorrência otimista, 409). */
+export class ConcorrenciaError extends DomainError {
+  readonly code = 'CONCORRENCIA';
+  readonly tipo = 'conflito' as const;
+
+  constructor(mensagem = 'Esta iniciativa foi alterada por outra pessoa. Recarregue a página.') {
+    super(mensagem);
+  }
+}
+
+export class TipoNaoEncontradoError extends DomainError {
+  readonly code = 'TIPO_NAO_ENCONTRADO';
+  readonly tipo = 'nao_encontrado' as const;
+
+  constructor() {
+    super('Tipo de iniciativa não encontrado.');
+  }
+}
+
+/** Tipo com iniciativas associadas não pode ser excluído (só desativado). */
+export class TipoEmUsoError extends DomainError {
+  readonly code = 'TIPO_EM_USO';
+  readonly tipo = 'conflito' as const;
+
+  constructor(readonly quantidade?: number) {
+    super(TipoEmUsoError.mensagem(quantidade));
+  }
+
+  private static mensagem(quantidade?: number): string {
+    const sufixo = 'Você pode desativá-lo.';
+    if (quantidade === undefined) {
+      return `Este tipo não pode ser excluído porque há iniciativas associadas a ele. ${sufixo}`;
+    }
+    const iniciativas = quantidade === 1 ? 'iniciativa associada' : 'iniciativas associadas';
+    return `Este tipo não pode ser excluído porque há ${quantidade} ${iniciativas} a ele. ${sufixo}`;
+  }
+}
+
+// ===== src/modules/iniciativas/domain/events/iniciativa.events.ts =====
+import { DomainEvent } from '@/shared/domain/domain-event';
+
+/** Eventos de domínio de `iniciativas`: imutáveis, com `iniciativaId`, `ciclo` e `ocorreuEm`. */
+abstract class EventoDeIniciativa extends DomainEvent {
+  constructor(
+    readonly iniciativaId: string,
+    readonly ciclo: number,
+    ocorreuEm: Date,
+  ) {
+    super(ocorreuEm);
+  }
+}
+
+export class IniciativaSubmetida extends EventoDeIniciativa {}
+
+export class IniciativaEditada extends EventoDeIniciativa {}
+
+export class RefinamentoEncerrado extends EventoDeIniciativa {
+  constructor(
+    iniciativaId: string,
+    ciclo: number,
+    ocorreuEm: Date,
+    /** Para onde a iniciativa foi: votação ou direto para a análise. */
+    readonly proximoStatus: 'EM_VOTACAO' | 'EM_ANALISE',
+  ) {
+    super(iniciativaId, ciclo, ocorreuEm);
+  }
+}
+
+export class VotacaoEncerrada extends EventoDeIniciativa {}
+
+export class IniciativaDecidida extends EventoDeIniciativa {
+  constructor(
+    iniciativaId: string,
+    ciclo: number,
+    ocorreuEm: Date,
+    readonly resultado: 'APROVADA' | 'REPROVADA',
+    readonly decisorId: string,
+  ) {
+    super(iniciativaId, ciclo, ocorreuEm);
+  }
+}
+
+export class IniciativaRessubmetida extends EventoDeIniciativa {}
+
+/** As datas ou horários de uma aprovada mudaram (a série inteira é recalculada). */
+export class DatasIniciativaAlteradas extends EventoDeIniciativa {
+  constructor(
+    iniciativaId: string,
+    ciclo: number,
+    ocorreuEm: Date,
+    readonly alteradaPor: string,
+  ) {
+    super(iniciativaId, ciclo, ocorreuEm);
+  }
+}
+
+// ===== src/modules/iniciativas/domain/iniciativa.ts =====
+import type { Clock } from '@/shared/domain/clock';
+import type { DomainEvent } from '@/shared/domain/domain-event';
+import {
+  AutorNaoPodeDecidirError,
+  SomenteAutorError,
+  SomenteComiteError,
+  TransicaoInvalidaError,
+} from './errors/iniciativas.errors';
+import {
+  DatasIniciativaAlteradas,
+  IniciativaDecidida,
+  IniciativaEditada,
+  IniciativaRessubmetida,
+  IniciativaSubmetida,
+  RefinamentoEncerrado,
+  VotacaoEncerrada,
+} from './events/iniciativa.events';
+import { MS_POR_DIA, type PrazosConfig } from './ports/prazos-config';
+import type { StatusIniciativa } from './status';
+import type { DadosIniciativa, DatasIniciativaBrutas } from './value-objects/dados-iniciativa';
+
+/** Autor das transições feitas pelo job e pelos prazos. */
+export const AUTOR_SISTEMA = 'SISTEMA';
+
+export const NOTAS = {
+  submetida: 'Submetida e aberta a sugestões',
+  editada: 'Iniciativa editada durante o refinamento',
+  refinamentoEncerrado: 'Prazo de refinamento encerrado',
+  votacaoEncerrada: 'Prazo de votação encerrado',
+  aprovada: 'Aprovada pelo comitê',
+  reprovada: 'Reprovada pelo comitê',
+  ressubmetida: (ciclo: number) => `Ressubmetida após reprovação (ciclo ${ciclo})`,
+  datasAlteradas: (antes: DadosIniciativa, depois: DadosIniciativa) =>
+    `Datas alteradas: de ${descreverPeriodo(antes)} para ${descreverPeriodo(depois)}`,
+} as const;
+
+/** `YYYY-MM-DD` → `DD/MM/YYYY`. */
+const dataBr = (dia: string) => dia.split('-').reverse().join('/');
+
+/** Ex.: `10/12/2026 a 11/12/2026, 09:00–18:00` ou `10/12/2026 (dia inteiro)`. */
+function descreverPeriodo(dados: DadosIniciativa): string {
+  const datas =
+    dados.inicio === dados.fim
+      ? dataBr(dados.inicio)
+      : `${dataBr(dados.inicio)} a ${dataBr(dados.fim)}`;
+  return dados.horaInicio
+    ? `${datas}, ${dados.horaInicio}–${dados.horaFim}`
+    : `${datas} (dia inteiro)`;
+}
+
+/** Uma entrada do histórico de status. */
+export interface Transicao {
+  de: StatusIniciativa | null;
+  para: StatusIniciativa;
+  /** Id do usuário ou `SISTEMA`. */
+  por: string;
+  nota: string;
+  /** Preenchida na reprovação, para preservar o texto após a ressubmissão. */
+  justificativa: string | null;
+  ocorreuEm: Date;
+  ciclo: number;
+}
+
+export interface IniciativaProps {
+  id: string;
+  autorId: string;
+  dados: DadosIniciativa;
+  comVotacao: boolean;
+  status: StatusIniciativa;
+  ciclo: number;
+  fimRefinamento: Date | null;
+  fimVotacao: Date | null;
+  justificativa: string | null;
+  decisorId: string | null;
+  decididaEm: Date | null;
+  version: number;
+  criadaEm: Date;
+}
+
+export interface Permissoes {
+  podeEditar: boolean;
+  podeComentar: boolean;
+  podeVotar: boolean;
+  podeDecidir: boolean;
+  motivoNaoPodeDecidir?: string;
+  podeRessubmeter: boolean;
+}
+
+const diasEmMs = (dias: number) => Math.round(dias * MS_POR_DIA);
+
+/**
+ * Agregado `Iniciativa`: dono da máquina de estados (RN-03, 04, 06, 10, 11). O estado é
+ * privado; só os métodos de comportamento o alteram e registram transições (histórico) e
+ * eventos de domínio.
+ */
+export class Iniciativa {
+  private transicoesNovas: Transicao[] = [];
+  private eventos: DomainEvent[] = [];
+
+  private constructor(
+    private props: IniciativaProps,
+    private ehNova: boolean,
+  ) {}
+
+  // --- criação ---------------------------------------------------------------------------
+
+  /** RN-03: cria em `EM_ANDAMENTO`, ciclo 1, com `fimRefinamento = agora + prazo`. */
+  static submeter(
+    dados: DadosIniciativa,
+    autorId: string,
+    comVotacao: boolean,
+    clock: Clock,
+    prazos: PrazosConfig,
+  ): Iniciativa {
+    const agora = clock.now();
+    const iniciativa = new Iniciativa(
+      {
+        id: globalThis.crypto.randomUUID(),
+        autorId,
+        dados,
+        comVotacao,
+        status: 'EM_ANDAMENTO',
+        ciclo: 1,
+        fimRefinamento: new Date(agora.getTime() + diasEmMs(prazos.refinamentoDias)),
+        fimVotacao: null,
+        justificativa: null,
+        decisorId: null,
+        decididaEm: null,
+        version: 0,
+        criadaEm: agora,
+      },
+      true,
+    );
+    iniciativa.registrar(null, 'EM_ANDAMENTO', autorId, NOTAS.submetida, agora);
+    iniciativa.eventos.push(new IniciativaSubmetida(iniciativa.props.id, 1, agora));
+    return iniciativa;
+  }
+
+  /** Reconstitui uma iniciativa já persistida (sem eventos nem transições pendentes). */
+  static reconstituir(props: IniciativaProps): Iniciativa {
+    return new Iniciativa({ ...props }, false);
+  }
+
+  // --- leitura ---------------------------------------------------------------------------
+
+  get id(): string {
+    return this.props.id;
+  }
+  get autorId(): string {
+    return this.props.autorId;
+  }
+  get dados(): DadosIniciativa {
+    return this.props.dados;
+  }
+  get comVotacao(): boolean {
+    return this.props.comVotacao;
+  }
+  get status(): StatusIniciativa {
+    return this.props.status;
+  }
+  get ciclo(): number {
+    return this.props.ciclo;
+  }
+  get fimRefinamento(): Date | null {
+    return this.props.fimRefinamento;
+  }
+  get fimVotacao(): Date | null {
+    return this.props.fimVotacao;
+  }
+  get justificativa(): string | null {
+    return this.props.justificativa;
+  }
+  get decisorId(): string | null {
+    return this.props.decisorId;
+  }
+  get decididaEm(): Date | null {
+    return this.props.decididaEm;
+  }
+  get version(): number {
+    return this.props.version;
+  }
+  get criadaEm(): Date {
+    return this.props.criadaEm;
+  }
+  get nova(): boolean {
+    return this.ehNova;
+  }
+
+  /** Transições ainda não gravadas (o repositório as persiste junto com a iniciativa). */
+  novasTransicoes(): readonly Transicao[] {
+    return this.transicoesNovas;
+  }
+
+  pullEvents(): DomainEvent[] {
+    const eventos = this.eventos;
+    this.eventos = [];
+    return eventos;
+  }
+
+  /** Chamado pelo repositório depois de gravar: limpa o pendente e avança a versão. */
+  confirmarGravacao(): void {
+    this.transicoesNovas = [];
+    this.props = { ...this.props, version: this.props.version + 1 };
+    this.ehNova = false;
+  }
+
+  // --- comportamento ---------------------------------------------------------------------
+
+  /** RN-04: só o autor (403) e só em `EM_ANDAMENTO` (409). Pode mudar `comVotacao`. */
+  editar(dados: DadosIniciativa, comVotacao: boolean, porUsuarioId: string, clock: Clock): void {
+    if (porUsuarioId !== this.props.autorId) throw new SomenteAutorError('editar');
+    if (this.props.status !== 'EM_ANDAMENTO') {
+      throw new TransicaoInvalidaError(this.props.status, 'editar');
+    }
+    const agora = clock.now();
+    this.props = { ...this.props, dados, comVotacao };
+    this.registrar('EM_ANDAMENTO', 'EM_ANDAMENTO', porUsuarioId, NOTAS.editada, agora);
+    this.eventos.push(new IniciativaEditada(this.props.id, this.props.ciclo, agora));
+  }
+
+  /**
+   * RN-06: fim do refinamento. Com votação vai para `EM_VOTACAO` (com `fimVotacao =
+   * fimRefinamento + prazo`); sem votação, direto para `EM_ANALISE`. O histórico registra o
+   * prazo vencido, não o instante da execução.
+   */
+  encerrarRefinamento(prazos: PrazosConfig): void {
+    if (this.props.status !== 'EM_ANDAMENTO') {
+      throw new TransicaoInvalidaError(this.props.status, 'encerrarRefinamento');
+    }
+    const prazo = this.props.fimRefinamento ?? this.props.criadaEm;
+    if (this.props.comVotacao) {
+      this.props = {
+        ...this.props,
+        status: 'EM_VOTACAO',
+        fimVotacao: new Date(prazo.getTime() + diasEmMs(prazos.votacaoDias)),
+      };
+      this.registrar(
+        'EM_ANDAMENTO',
+        'EM_VOTACAO',
+        AUTOR_SISTEMA,
+        NOTAS.refinamentoEncerrado,
+        prazo,
+      );
+      this.eventos.push(
+        new RefinamentoEncerrado(this.props.id, this.props.ciclo, prazo, 'EM_VOTACAO'),
+      );
+    } else {
+      this.props = { ...this.props, status: 'EM_ANALISE' };
+      this.registrar(
+        'EM_ANDAMENTO',
+        'EM_ANALISE',
+        AUTOR_SISTEMA,
+        NOTAS.refinamentoEncerrado,
+        prazo,
+      );
+      this.eventos.push(
+        new RefinamentoEncerrado(this.props.id, this.props.ciclo, prazo, 'EM_ANALISE'),
+      );
+    }
+  }
+
+  /** RN-06: fim da votação, vai para `EM_ANALISE`. */
+  encerrarVotacao(): void {
+    if (this.props.status !== 'EM_VOTACAO') {
+      throw new TransicaoInvalidaError(this.props.status, 'encerrarVotacao');
+    }
+    const prazo = this.props.fimVotacao ?? this.props.criadaEm;
+    this.props = { ...this.props, status: 'EM_ANALISE' };
+    this.registrar('EM_VOTACAO', 'EM_ANALISE', AUTOR_SISTEMA, NOTAS.votacaoEncerrada, prazo);
+    this.eventos.push(new VotacaoEncerrada(this.props.id, this.props.ciclo, prazo));
+  }
+
+  /**
+   * RN-06: aplica as transições cujo prazo já venceu em `clock.now()`. Uma iniciativa
+   * vencida há muito tempo passa pelas duas transições na mesma chamada (duas entradas).
+   */
+  aplicarPrazosVencidos(clock: Clock, prazos: PrazosConfig): Transicao[] {
+    const antes = this.transicoesNovas.length;
+    const agora = clock.now().getTime();
+    if (
+      this.props.status === 'EM_ANDAMENTO' &&
+      this.props.fimRefinamento &&
+      agora >= this.props.fimRefinamento.getTime()
+    ) {
+      this.encerrarRefinamento(prazos);
+    }
+    if (
+      this.props.status === 'EM_VOTACAO' &&
+      this.props.fimVotacao &&
+      agora >= this.props.fimVotacao.getTime()
+    ) {
+      this.encerrarVotacao();
+    }
+    return this.transicoesNovas.slice(antes);
+  }
+
+  /**
+   * RN-10: só em `EM_ANALISE`; o autor não decide a própria iniciativa (403); reprovar
+   * exige justificativa (validada no caso de uso, que também a apara). Registra decisor,
+   * data e o histórico.
+   */
+  decidir(
+    resultado: 'APROVADA' | 'REPROVADA',
+    justificativa: string | undefined,
+    decisorId: string,
+    clock: Clock,
+  ): void {
+    if (decisorId === this.props.autorId) throw new AutorNaoPodeDecidirError();
+    if (this.props.status !== 'EM_ANALISE') {
+      throw new TransicaoInvalidaError(this.props.status, 'decidir');
+    }
+    const agora = clock.now();
+    const texto = resultado === 'REPROVADA' ? (justificativa?.trim() ?? '') : '';
+    this.props = {
+      ...this.props,
+      status: resultado,
+      decisorId,
+      decididaEm: agora,
+      justificativa: resultado === 'REPROVADA' ? texto : null,
+    };
+    this.registrar(
+      'EM_ANALISE',
+      resultado,
+      decisorId,
+      resultado === 'APROVADA' ? NOTAS.aprovada : NOTAS.reprovada,
+      agora,
+      resultado === 'REPROVADA' ? texto : null,
+    );
+    this.eventos.push(
+      new IniciativaDecidida(this.props.id, this.props.ciclo, agora, resultado, decisorId),
+    );
+  }
+
+  /**
+   * RN-11: só o autor (403), só em `REPROVADA` (409). Incrementa o ciclo, reabre o
+   * refinamento com novo prazo e limpa a decisão (a justificativa anterior fica no histórico).
+   */
+  ressubmeter(
+    dados: DadosIniciativa,
+    comVotacao: boolean,
+    porUsuarioId: string,
+    clock: Clock,
+    prazos: PrazosConfig,
+  ): void {
+    if (porUsuarioId !== this.props.autorId) throw new SomenteAutorError('ressubmeter');
+    if (this.props.status !== 'REPROVADA') {
+      throw new TransicaoInvalidaError(this.props.status, 'ressubmeter');
+    }
+    const agora = clock.now();
+    const ciclo = this.props.ciclo + 1;
+    this.props = {
+      ...this.props,
+      dados,
+      comVotacao,
+      status: 'EM_ANDAMENTO',
+      ciclo,
+      fimRefinamento: new Date(agora.getTime() + diasEmMs(prazos.refinamentoDias)),
+      fimVotacao: null,
+      decisorId: null,
+      decididaEm: null,
+      justificativa: null,
+    };
+    this.registrar('REPROVADA', 'EM_ANDAMENTO', porUsuarioId, NOTAS.ressubmetida(ciclo), agora);
+    this.eventos.push(new IniciativaRessubmetida(this.props.id, ciclo, agora));
+  }
+
+  /**
+   * Muda datas e horários de uma aprovada (a série inteira das ocorrências). Só o comitê ou o
+   * ADMIN (403) e só em `APROVADA` (409). O autor que é do comitê também pode: não é uma
+   * decisão, então não há conflito de interesse. Registra no histórico o antes e o depois.
+   */
+  alterarDatas(
+    datas: DatasIniciativaBrutas,
+    ator: { id: string; ehComite: boolean },
+    clock: Clock,
+  ): void {
+    if (!ator.ehComite) throw new SomenteComiteError();
+    if (this.props.status !== 'APROVADA') {
+      throw new TransicaoInvalidaError(this.props.status, 'alterarDatas');
+    }
+    const antes = this.props.dados;
+    const depois = antes.comDatas(datas);
+    const agora = clock.now();
+    this.props = { ...this.props, dados: depois };
+    this.registrar('APROVADA', 'APROVADA', ator.id, NOTAS.datasAlteradas(antes, depois), agora);
+    this.eventos.push(
+      new DatasIniciativaAlteradas(this.props.id, this.props.ciclo, agora, ator.id),
+    );
+  }
+
+  /** O que o usuário pode fazer agora. Calculado no domínio: o front não recalcula regras. */
+  permissoesPara(usuario: { id: string; ehComite: boolean }, clock: Clock): Permissoes {
+    const agora = clock.now().getTime();
+    const ehAutor = usuario.id === this.props.autorId;
+    const refinamentoAberto =
+      this.props.status === 'EM_ANDAMENTO' &&
+      !(this.props.fimRefinamento && agora >= this.props.fimRefinamento.getTime());
+    const votacaoAberta =
+      this.props.status === 'EM_VOTACAO' &&
+      !(this.props.fimVotacao && agora >= this.props.fimVotacao.getTime());
+    const emAnalise = this.props.status === 'EM_ANALISE';
+
+    const permissoes: Permissoes = {
+      podeEditar: ehAutor && refinamentoAberto,
+      podeComentar: refinamentoAberto,
+      podeVotar: votacaoAberta,
+      podeDecidir: usuario.ehComite && emAnalise && !ehAutor,
+      podeRessubmeter: ehAutor && this.props.status === 'REPROVADA',
+    };
+    if (usuario.ehComite && emAnalise && ehAutor) {
+      permissoes.motivoNaoPodeDecidir = new AutorNaoPodeDecidirError().message;
+    }
+    return permissoes;
+  }
+
+  // --- interno ---------------------------------------------------------------------------
+
+  private registrar(
+    de: StatusIniciativa | null,
+    para: StatusIniciativa,
+    por: string,
+    nota: string,
+    ocorreuEm: Date,
+    justificativa: string | null = null,
+  ): void {
+    this.transicoesNovas.push({
+      de,
+      para,
+      por,
+      nota,
+      justificativa,
+      ocorreuEm,
+      ciclo: this.props.ciclo,
+    });
+  }
+}
+
+// ===== src/modules/iniciativas/domain/ports/iniciativa.repository.ts =====
+import type { Iniciativa } from '../iniciativa';
+
+export interface IniciativaRepository {
+  buscarPorId(id: string): Promise<Iniciativa | null>;
+
+  /** Grava uma iniciativa nova (com o histórico inicial). */
+  criar(iniciativa: Iniciativa): Promise<void>;
+
+  /**
+   * Grava as mudanças e as transições novas do histórico, com concorrência otimista:
+   * lança `ConcorrenciaError` se outra gravação mudou a iniciativa desde a leitura.
+   */
+  salvar(iniciativa: Iniciativa): Promise<void>;
+
+  /** Ids de iniciativas em andamento ou em votação cujo prazo já venceu em `agora`. */
+  idsComPrazoVencido(agora: Date, limite: number): Promise<string[]>;
+}
+
+// ===== src/modules/iniciativas/domain/ports/prazos-config.ts =====
+/** Prazos do ciclo de vida da iniciativa, em dias (aceita fração). Vêm da configuração. */
+export interface PrazosConfig {
+  readonly refinamentoDias: number;
+  readonly votacaoDias: number;
+}
+
+export const MS_POR_DIA = 24 * 60 * 60 * 1000;
+
+// ===== src/modules/iniciativas/domain/ports/tipo.repository.ts =====
+import type { RegistroTipo, TipoDeIniciativa } from '../tipo-de-iniciativa';
+
+/** Quem fez a ação (vai para o log de auditoria). */
+export interface AutorRegistro {
+  id: string;
+  nome: string;
+}
+
+export interface TipoRepository {
+  buscarPorId(id: number): Promise<TipoDeIniciativa | null>;
+
+  /** Todos os tipos, ativos e inativos, em ordem alfabética de nome. */
+  listar(): Promise<TipoDeIniciativa[]>;
+
+  /** Códigos dos tipos ativos (os que podem ser escolhidos numa iniciativa). */
+  codigosAtivos(): Promise<string[]>;
+
+  /** Quantas iniciativas usam cada tipo, por id (tipos sem nenhuma ficam de fora). */
+  contarIniciativas(): Promise<Map<number, number>>;
+
+  /** Grava um tipo novo e os registros pendentes do log. Devolve o id gerado. */
+  criar(tipo: TipoDeIniciativa, autor: AutorRegistro, agora: Date): Promise<number>;
+
+  /** Grava as mudanças e os registros pendentes do log. */
+  salvar(tipo: TipoDeIniciativa, autor: AutorRegistro, agora: Date): Promise<void>;
+
+  /**
+   * Exclui o tipo e grava o registro da exclusão. Lança `TipoEmUsoError` se alguma
+   * iniciativa passou a usá-lo nesse meio-tempo (a FK do banco garante).
+   */
+  excluir(
+    tipo: TipoDeIniciativa,
+    registro: RegistroTipo,
+    autor: AutorRegistro,
+    agora: Date,
+  ): Promise<void>;
+}
+
+// ===== src/modules/iniciativas/domain/status.ts =====
+export const STATUS_INICIATIVA = [
+  'EM_ANDAMENTO',
+  'EM_VOTACAO',
+  'EM_ANALISE',
+  'APROVADA',
+  'REPROVADA',
+] as const;
+
+export type StatusIniciativa = (typeof STATUS_INICIATIVA)[number];
+
+export const ROTULO_STATUS: Record<StatusIniciativa, string> = {
+  EM_ANDAMENTO: 'Em andamento',
+  EM_VOTACAO: 'Em votação',
+  EM_ANALISE: 'Em análise',
+  APROVADA: 'Aprovada',
+  REPROVADA: 'Reprovada',
+};
+
+export const ehStatus = (valor: string): valor is StatusIniciativa =>
+  (STATUS_INICIATIVA as readonly string[]).includes(valor);
+
+/** Operações que dependem do status (usadas na tabela de transições inválidas). */
+export type Operacao =
+  | 'editar'
+  | 'ressubmeter'
+  | 'decidir'
+  | 'encerrarRefinamento'
+  | 'encerrarVotacao';
+
+// ===== src/modules/iniciativas/domain/tipo-de-iniciativa.ts =====
+import { ValidacaoError } from '@/shared/domain/domain-error';
+import { FORMATO_CODIGO_TIPO } from './tipos';
+
+export const LIMITE_NOME_TIPO = 60;
+const FORMATO_COR = /^#[0-9A-Fa-f]{6}$/;
+
+/** Campos de um tipo que aparecem no log (antes e depois). */
+export interface CamposTipo {
+  nome: string;
+  cor: string;
+  ativo: boolean;
+}
+
+export interface TipoDeIniciativaProps extends CamposTipo {
+  id: number;
+  code: string;
+}
+
+/** Ação registrada no log de auditoria do cadastro de tipos (lookup `iniciativas_tipos_acoes`). */
+export type AcaoTipo = 'CRIADO' | 'ALTERADO' | 'ATIVADO' | 'DESATIVADO' | 'EXCLUIDO';
+
+/** Uma entrada do log, montada pelo domínio e gravada pelo repositório na mesma transação. */
+export interface RegistroTipo {
+  acao: AcaoTipo;
+  /** Só os campos que mudaram (`null` na criação). */
+  antes: Partial<CamposTipo> | null;
+  /** Só os campos que mudaram (`null` na exclusão). */
+  depois: Partial<CamposTipo> | null;
+}
+
+/**
+ * Nome comparável: sem acento, minúsculo e com espaços simples. "Liga  Acadêmica" e
+ * "liga academica" são o mesmo nome (não podem coexistir).
+ */
+export function normalizarNome(nome: string): string {
+  return nome
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+/** Código a partir do nome: "Liga Acadêmica" → `LIGA_ACADEMICA`. */
+export function codigoDoNome(nome: string): string {
+  const base = normalizarNome(nome)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 34);
+  return base || 'TIPO';
+}
+
+function validar(campos: { nome?: unknown; cor?: unknown }): { nome: string; cor: string } {
+  const erros: Record<string, string> = {};
+  const nome = typeof campos.nome === 'string' ? campos.nome.trim().replace(/\s+/g, ' ') : '';
+  if (!nome) erros.nome = 'Informe o nome do tipo.';
+  else if (nome.length > LIMITE_NOME_TIPO)
+    erros.nome = `O nome deve ter no máximo ${LIMITE_NOME_TIPO} caracteres.`;
+  const cor = typeof campos.cor === 'string' ? campos.cor.trim() : '';
+  if (!cor) erros.cor = 'Escolha a cor do tipo.';
+  else if (!FORMATO_COR.test(cor)) erros.cor = 'Informe a cor no formato #RRGGBB.';
+  if (Object.keys(erros).length > 0) throw new ValidacaoError(erros);
+  return { nome, cor: cor.toUpperCase() };
+}
+
+/**
+ * Tipo de iniciativa cadastrado pelo comitê ou pelo ADMIN. O `code` é gerado do nome na
+ * criação e nunca muda (as iniciativas e os filtros usam o código); o nome e a cor podem ser
+ * alterados. Cada mudança gera um `RegistroTipo` para o log de auditoria.
+ */
+export class TipoDeIniciativa {
+  private registros: RegistroTipo[] = [];
+
+  private constructor(private props: TipoDeIniciativaProps) {}
+
+  /**
+   * Cria um tipo ativo. `codigosEmUso` evita repetir o código (por exemplo, quando um tipo
+   * renomeado ainda tem o código do nome antigo): acrescenta `_2`, `_3`...
+   */
+  static criar(
+    campos: { nome?: unknown; cor?: unknown },
+    codigosEmUso: ReadonlySet<string>,
+  ): TipoDeIniciativa {
+    const { nome, cor } = validar(campos);
+    const base = codigoDoNome(nome);
+    let code = base;
+    for (let n = 2; codigosEmUso.has(code); n++) code = `${base}_${n}`;
+    if (!FORMATO_CODIGO_TIPO.test(code)) throw new ValidacaoError({ nome: 'Nome inválido.' });
+    const tipo = new TipoDeIniciativa({ id: 0, code, nome, cor, ativo: true });
+    tipo.registros.push({ acao: 'CRIADO', antes: null, depois: { nome, cor, ativo: true } });
+    return tipo;
+  }
+
+  static reconstituir(props: TipoDeIniciativaProps): TipoDeIniciativa {
+    return new TipoDeIniciativa({ ...props });
+  }
+
+  get id(): number {
+    return this.props.id;
+  }
+  get code(): string {
+    return this.props.code;
+  }
+  get nome(): string {
+    return this.props.nome;
+  }
+  get cor(): string {
+    return this.props.cor;
+  }
+  get ativo(): boolean {
+    return this.props.ativo;
+  }
+
+  /**
+   * Renomeia e/ou troca a cor (campos ausentes ficam como estão). Não registra nada se nada
+   * mudou de fato.
+   */
+  alterar(campos: { nome?: unknown; cor?: unknown }): void {
+    const { nome, cor } = validar({
+      nome: campos.nome === undefined ? this.props.nome : campos.nome,
+      cor: campos.cor === undefined ? this.props.cor : campos.cor,
+    });
+    const antes: Partial<CamposTipo> = {};
+    const depois: Partial<CamposTipo> = {};
+    if (nome !== this.props.nome) {
+      antes.nome = this.props.nome;
+      depois.nome = nome;
+    }
+    if (cor !== this.props.cor) {
+      antes.cor = this.props.cor;
+      depois.cor = cor;
+    }
+    if (Object.keys(depois).length === 0) return;
+    this.props = { ...this.props, nome, cor };
+    this.registros.push({ acao: 'ALTERADO', antes, depois });
+  }
+
+  /** Ativa ou desativa. Sem efeito (nem registro) se já está no estado pedido. */
+  definirAtivo(ativo: boolean): void {
+    if (ativo === this.props.ativo) return;
+    this.props = { ...this.props, ativo };
+    this.registros.push({
+      acao: ativo ? 'ATIVADO' : 'DESATIVADO',
+      antes: { ativo: !ativo },
+      depois: { ativo },
+    });
+  }
+
+  /** Registro da exclusão. Quem confere se há iniciativas associadas é o caso de uso. */
+  registroDeExclusao(): RegistroTipo {
+    return {
+      acao: 'EXCLUIDO',
+      antes: { nome: this.props.nome, cor: this.props.cor, ativo: this.props.ativo },
+      depois: null,
+    };
+  }
+
+  /** Registros ainda não gravados (o repositório os grava junto com o tipo). */
+  pullRegistros(): RegistroTipo[] {
+    const registros = this.registros;
+    this.registros = [];
+    return registros;
+  }
+}
+
+// ===== src/modules/iniciativas/domain/tipos.ts =====
+/**
+ * Código de um tipo de iniciativa (por exemplo `PALESTRA`). Os tipos são um cadastro mantido
+ * pelo comitê e pelo ADMIN (`TipoDeIniciativa`), então o código é texto no formato
+ * `FORMATO_CODIGO_TIPO`; se ele existe e está ativo, quem confere é o caso de uso.
+ */
+export type TipoIniciativa = string;
+
+/** Letras maiúsculas sem acento, dígitos e `_`, até 40 caracteres. */
+export const FORMATO_CODIGO_TIPO = /^[A-Z0-9_]{1,40}$/;
+
+export const PERIODICIDADES = ['EVENTO_UNICO', 'DIARIA', 'SEMANAL', 'QUINZENAL', 'MENSAL'] as const;
+export type Periodicidade = (typeof PERIODICIDADES)[number];
+
+export const ROTULO_PERIODICIDADE: Record<Periodicidade, string> = {
+  EVENTO_UNICO: 'Evento único',
+  DIARIA: 'Diária',
+  SEMANAL: 'Semanal',
+  QUINZENAL: 'Quinzenal',
+  MENSAL: 'Mensal',
+};
+
+// ===== src/modules/iniciativas/domain/value-objects/dados-iniciativa.ts =====
+import { ValidacaoError } from '@/shared/domain/domain-error';
+import {
+  FORMATO_CODIGO_TIPO,
+  PERIODICIDADES,
+  type Periodicidade,
+  type TipoIniciativa,
+} from '../tipos';
+
+/** Entrada bruta (como veio do HTTP). Todos os campos são validados aqui (RN-01 e RN-02). */
+export interface DadosIniciativaBrutos {
+  tipo?: unknown;
+  titulo?: unknown;
+  resumo?: unknown;
+  detalhe?: unknown;
+  inicio?: unknown;
+  fim?: unknown;
+  horaInicio?: unknown;
+  horaFim?: unknown;
+  periodicidade?: unknown;
+  espaco?: unknown;
+  organizadores?: unknown;
+  membros?: unknown;
+  participantes?: unknown;
+}
+
+/** Só as datas e os horários (alteração de datas de uma aprovada). */
+export type DatasIniciativaBrutas = Pick<
+  DadosIniciativaBrutos,
+  'inicio' | 'fim' | 'horaInicio' | 'horaFim'
+>;
+
+export const LIMITES = {
+  titulo: 120,
+  resumo: 280,
+  detalhe: 5000,
+  espaco: 200,
+  organizadores: 500,
+  membros: 500,
+  participantesMax: 100_000,
+} as const;
+
+const REGEX_DATA = /^\d{4}-\d{2}-\d{2}$/;
+const REGEX_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function dataValida(valor: string): boolean {
+  if (!REGEX_DATA.test(valor)) return false;
+  const [ano, mes, dia] = valor.split('-').map(Number);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  return (
+    data.getUTCFullYear() === ano && data.getUTCMonth() === mes - 1 && data.getUTCDate() === dia
+  );
+}
+
+/** Texto aparado, ou `''` quando não é string. */
+const texto = (valor: unknown): string => (typeof valor === 'string' ? valor.trim() : '');
+
+/**
+ * Dados de uma iniciativa, já validados (imutável). `criar` acumula TODOS os erros de campo
+ * num `ValidacaoError` (422 com `errors` por campo, com os nomes dos campos do DTO).
+ */
+export class DadosIniciativa {
+  private constructor(
+    readonly tipo: TipoIniciativa,
+    readonly titulo: string,
+    readonly resumo: string,
+    readonly detalhe: string,
+    /** `YYYY-MM-DD` */
+    readonly inicio: string,
+    readonly fim: string,
+    /** `HH:mm`, ou null (dia inteiro). Sempre juntas com `horaFim`. */
+    readonly horaInicio: string | null,
+    readonly horaFim: string | null,
+    readonly periodicidade: Periodicidade,
+    readonly espaco: string,
+    readonly organizadores: string,
+    readonly membros: string | null,
+    readonly participantes: number,
+  ) {}
+
+  /**
+   * `tiposPermitidos`: códigos dos tipos que podem ser escolhidos (os ativos do cadastro, e o
+   * tipo atual da iniciativa na edição). O caso de uso sempre informa; sem ele, só o formato
+   * do código é conferido (usado ao revalidar dados que já foram aceitos, como em `comDatas`).
+   */
+  static criar(
+    brutos: DadosIniciativaBrutos,
+    tiposPermitidos?: ReadonlySet<string>,
+  ): DadosIniciativa {
+    const erros: Record<string, string> = {};
+
+    const tipo = texto(brutos.tipo);
+    if (!tipo || !FORMATO_CODIGO_TIPO.test(tipo)) erros.tipo = 'Selecione o tipo.';
+    else if (tiposPermitidos && !tiposPermitidos.has(tipo))
+      erros.tipo = 'Este tipo não existe ou foi desativado. Selecione outro.';
+
+    const titulo = texto(brutos.titulo);
+    if (!titulo) erros.titulo = 'Informe o título.';
+    else if (titulo.length > LIMITES.titulo)
+      erros.titulo = `O título deve ter no máximo ${LIMITES.titulo} caracteres.`;
+
+    const resumo = texto(brutos.resumo);
+    if (!resumo) erros.resumo = 'Escreva uma descrição resumida.';
+    else if (resumo.length > LIMITES.resumo)
+      erros.resumo = `A descrição resumida deve ter no máximo ${LIMITES.resumo} caracteres.`;
+
+    const detalhe = texto(brutos.detalhe);
+    if (!detalhe) erros.detalhe = 'Escreva a descrição detalhada.';
+    else if (detalhe.length > LIMITES.detalhe)
+      erros.detalhe = `A descrição detalhada deve ter no máximo ${LIMITES.detalhe} caracteres.`;
+
+    const inicio = texto(brutos.inicio);
+    if (!inicio) erros.inicio = 'Informe a data de início.';
+    else if (!dataValida(inicio)) erros.inicio = 'Informe uma data de início válida.';
+
+    const fim = texto(brutos.fim);
+    if (!fim) erros.fim = 'Informe a data de término.';
+    else if (!dataValida(fim)) erros.fim = 'Informe uma data de término válida.';
+    else if (inicio && dataValida(inicio) && fim < inicio)
+      erros.fim = 'A data de término deve ser igual ou posterior à de início.';
+
+    const horaInicio = texto(brutos.horaInicio);
+    const horaFim = texto(brutos.horaFim);
+    if (horaInicio && !horaFim) {
+      erros.horaFim = 'Informe a hora de término ou apague a de início.';
+    } else if (!horaInicio && horaFim) {
+      erros.horaInicio = 'Informe a hora de início ou apague a de término.';
+    } else if (horaInicio && horaFim) {
+      if (!REGEX_HORA.test(horaInicio)) erros.horaInicio = 'Informe uma hora de início válida.';
+      if (!REGEX_HORA.test(horaFim)) erros.horaFim = 'Informe uma hora de término válida.';
+      else if (REGEX_HORA.test(horaInicio) && horaFim <= horaInicio)
+        erros.horaFim = 'A hora de término deve ser posterior à de início.';
+    }
+
+    const periodicidade = texto(brutos.periodicidade);
+    if (!(PERIODICIDADES as readonly string[]).includes(periodicidade))
+      erros.periodicidade = 'Selecione a periodicidade.';
+
+    const espaco = texto(brutos.espaco);
+    if (!espaco) erros.espaco = 'Informe o espaço utilizado.';
+    else if (espaco.length > LIMITES.espaco)
+      erros.espaco = `O espaço deve ter no máximo ${LIMITES.espaco} caracteres.`;
+
+    const organizadores = texto(brutos.organizadores);
+    if (!organizadores) erros.organizadores = 'Informe ao menos um organizador.';
+    else if (organizadores.length > LIMITES.organizadores)
+      erros.organizadores = `Os organizadores devem ter no máximo ${LIMITES.organizadores} caracteres.`;
+
+    const membros = texto(brutos.membros);
+    if (membros.length > LIMITES.membros)
+      erros.membros = `Os membros devem ter no máximo ${LIMITES.membros} caracteres.`;
+
+    const participantes = Number(brutos.participantes);
+    if (!Number.isInteger(participantes) || participantes < 1)
+      erros.participantes = 'Informe um número maior que zero.';
+    else if (participantes > LIMITES.participantesMax)
+      erros.participantes = `O número de participantes deve ser no máximo ${LIMITES.participantesMax}.`;
+
+    if (Object.keys(erros).length > 0) {
+      throw new ValidacaoError(erros);
+    }
+
+    return new DadosIniciativa(
+      tipo as TipoIniciativa,
+      titulo,
+      resumo,
+      detalhe,
+      inicio,
+      fim,
+      horaInicio || null,
+      horaFim || null,
+      periodicidade as Periodicidade,
+      espaco,
+      organizadores,
+      membros || null,
+      participantes,
+    );
+  }
+
+  /**
+   * Cópia com novas datas e horários (os demais campos ficam como estão). Revalida com as
+   * mesmas regras de `criar` (RN-02), então só os erros de data e hora podem aparecer.
+   */
+  comDatas(datas: DatasIniciativaBrutas): DadosIniciativa {
+    return DadosIniciativa.criar({
+      tipo: this.tipo,
+      titulo: this.titulo,
+      resumo: this.resumo,
+      detalhe: this.detalhe,
+      periodicidade: this.periodicidade,
+      espaco: this.espaco,
+      organizadores: this.organizadores,
+      membros: this.membros,
+      participantes: this.participantes,
+      inicio: datas.inicio,
+      fim: datas.fim,
+      horaInicio: datas.horaInicio,
+      horaFim: datas.horaFim,
+    });
+  }
+
+  get temHorario(): boolean {
+    return this.horaInicio !== null;
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/adapters/eventos.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import type { DomainEvent } from '@/shared/domain/domain-event';
+import { DomainEventPublisher } from '@/shared/infrastructure/domain-event-publisher';
+import type { EventosPort } from '../../application/ports/eventos.port';
+
+@Injectable()
+export class EventosAdapter implements EventosPort {
+  constructor(private readonly publicador: DomainEventPublisher) {}
+
+  publicar(eventos: DomainEvent[]): void {
+    this.publicador.publicar(eventos);
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/adapters/google-agenda.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { DivulgacaoFacade } from '@/modules/divulgacao/application/divulgacao.facade';
+import type {
+  DadosGoogleAgenda,
+  GoogleAgendaPort,
+} from '../../application/ports/google-agenda.port';
+
+type DadosDivulgacao = Parameters<DivulgacaoFacade['googleAgendaUrl']>[0];
+
+/** Resolve `DivulgacaoFacade` na primeira chamada: `iniciativas` e `divulgacao` dependem um do outro. */
+@Injectable()
+export class GoogleAgendaAdapter implements GoogleAgendaPort {
+  private divulgacao?: DivulgacaoFacade;
+
+  constructor(private readonly moduleRef: ModuleRef) {}
+
+  url(dados: DadosGoogleAgenda): string {
+    this.divulgacao ??= this.moduleRef.get(DivulgacaoFacade, { strict: false });
+    return this.divulgacao.googleAgendaUrl({
+      ...dados,
+      periodicidade: dados.periodicidade as DadosDivulgacao['periodicidade'],
+    });
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/adapters/sugestoes.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { RefinamentoFacade } from '@/modules/refinamento/application/refinamento.facade';
+import type { SugestoesPort } from '../../application/ports/sugestoes.port';
+
+/**
+ * `iniciativas` e `refinamento` dependem um do outro. Para não criar um ciclo de providers,
+ * a fachada do outro módulo é resolvida na primeira chamada (e não na construção).
+ */
+@Injectable()
+export class SugestoesAdapter implements SugestoesPort {
+  private refinamento?: RefinamentoFacade;
+
+  constructor(private readonly moduleRef: ModuleRef) {}
+
+  contar(pares: Array<{ iniciativaId: string; ciclo: number }>): Promise<Map<string, number>> {
+    this.refinamento ??= this.moduleRef.get(RefinamentoFacade, { strict: false });
+    return this.refinamento.contarSugestoes(pares);
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/adapters/usuarios.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import { IdentidadeFacade } from '@/modules/identidade/application/identidade.facade';
+import type { UsuarioResumo, UsuariosPort } from '../../application/ports/usuarios.port';
+
+@Injectable()
+export class UsuariosAdapter implements UsuariosPort {
+  constructor(private readonly identidade: IdentidadeFacade) {}
+
+  mapaPorIds(ids: string[]): Promise<Map<string, UsuarioResumo>> {
+    return this.identidade.mapaPorIds(ids);
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/adapters/votos.adapter.ts =====
+import { Injectable } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { VotacaoFacade } from '@/modules/votacao/application/votacao.facade';
+import type { VotosPort } from '../../application/ports/votos.port';
+
+/** Resolve `VotacaoFacade` na primeira chamada: `iniciativas` e `votacao` dependem um do outro. */
+@Injectable()
+export class VotosAdapter implements VotosPort {
+  private votacao?: VotacaoFacade;
+
+  constructor(private readonly moduleRef: ModuleRef) {}
+
+  meuVoto(iniciativaId: string, ciclo: number, usuarioId: string): Promise<1 | -1 | 0> {
+    this.votacao ??= this.moduleRef.get(VotacaoFacade, { strict: false });
+    return this.votacao.meuVoto(iniciativaId, ciclo, usuarioId);
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/config/prazos.provider.ts =====
+import type { ConfigService } from '@nestjs/config';
+import type { PrazosConfig } from '../../domain/ports/prazos-config';
+
+/** Lê os prazos (`PRAZO_REFINAMENTO_DIAS` e `PRAZO_VOTACAO_DIAS`) da configuração. */
+export function prazosDaConfiguracao(config: ConfigService): PrazosConfig {
+  return {
+    refinamentoDias: config.getOrThrow<number>('prazos.refinamentoDias'),
+    votacaoDias: config.getOrThrow<number>('prazos.votacaoDias'),
+  };
+}
+
+// ===== src/modules/iniciativas/infrastructure/persistence/iniciativa-listagem.query.ts =====
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
+import type {
+  FiltroLeitura,
+  IniciativaLeituraPort,
+  LinhaCalendario,
+  LinhaDetalhe,
+  LinhaHistorico,
+  LinhaResumo,
+} from '../../application/ports/iniciativa-leitura.port';
+import type { StatusIniciativa } from '../../domain/status';
+import type { TipoIniciativa } from '../../domain/tipos';
+
+/**
+ * Modelo de leitura das iniciativas, em SQL.
+ *
+ * EXCEÇÃO DOCUMENTADA À REGRA 5 (ver docs/DECISOES.md, ADR-002): esta consulta junta
+ * `votacao_placar` (tabela do módulo `votacao`) para ordenar por relevância com paginação
+ * no banco. A relevância (`votacao_placar.relevancia`) é mantida pelo módulo `votacao` na
+ * transação do voto; aqui ela só é lida. A ordem do SQL tem de bater com `compararRelevancia`
+ * do domínio de `votacao` (teste de integração RN-08.5).
+ */
+const COLUNAS_RESUMO = Prisma.sql`
+  i.id,
+  i.autor_id AS "autorId",
+  t.code AS tipo,
+  i.titulo,
+  i.resumo,
+  s.code AS status,
+  i.com_votacao AS "comVotacao",
+  i.ciclo,
+  i.fim_refinamento AS "fimRefinamento",
+  i.fim_votacao AS "fimVotacao",
+  to_char(i.inicio, 'YYYY-MM-DD') AS inicio,
+  to_char(i.fim, 'YYYY-MM-DD') AS fim,
+  p.code AS periodicidade,
+  i.espaco,
+  i.criada_em AS "criadaEm",
+  i.decidida_em AS "decididaEm",
+  COALESCE(pl.likes, 0)::int AS likes,
+  COALESCE(pl.dislikes, 0)::int AS dislikes,
+  COALESCE(pl.relevancia, 0)::float8 AS relevancia`;
+
+const JUNCOES = Prisma.sql`
+  FROM iniciativas i
+  JOIN iniciativas_status s ON s.id = i.status_id
+  JOIN iniciativas_tipos t ON t.id = i.tipo_id
+  JOIN iniciativas_periodicidades p ON p.id = i.periodicidade_id
+  LEFT JOIN votacao_placar pl ON pl.iniciativa_id = i.id AND pl.ciclo = i.ciclo`;
+
+function ordenacao(ordenar: FiltroLeitura['ordenar']): Prisma.Sql {
+  switch (ordenar) {
+    case 'relevancia':
+      // RN-08: maior relevância; desempate por mais votos totais, criada há mais tempo e id.
+      return Prisma.sql`ORDER BY COALESCE(pl.relevancia, 0) DESC,
+        (COALESCE(pl.likes, 0) + COALESCE(pl.dislikes, 0)) DESC, i.criada_em ASC, i.id ASC`;
+    case 'prazo':
+      return Prisma.sql`ORDER BY (CASE s.code
+          WHEN 'EM_ANDAMENTO' THEN i.fim_refinamento
+          WHEN 'EM_VOTACAO' THEN i.fim_votacao END) ASC NULLS LAST, i.criada_em ASC, i.id ASC`;
+    case 'inicio':
+      return Prisma.sql`ORDER BY i.inicio ASC, i.titulo ASC, i.id ASC`;
+    default:
+      return Prisma.sql`ORDER BY i.criada_em DESC, i.id ASC`;
+  }
+}
+
+function condicoes(filtro: Pick<FiltroLeitura, 'status' | 'tipo' | 'q' | 'autorId'>): Prisma.Sql {
+  const lista: Prisma.Sql[] = [];
+  if (filtro.status) lista.push(Prisma.sql`s.code = ${filtro.status}`);
+  if (filtro.tipo) lista.push(Prisma.sql`t.code = ${filtro.tipo}`);
+  if (filtro.autorId) lista.push(Prisma.sql`i.autor_id = ${filtro.autorId}`);
+  if (filtro.q) {
+    lista.push(
+      Prisma.sql`strpos(lower(i.titulo || ' ' || i.resumo || ' ' || i.organizadores || ' ' || i.espaco), lower(${filtro.q})) > 0`,
+    );
+  }
+  return lista.length > 0 ? Prisma.sql`WHERE ${Prisma.join(lista, ' AND ')}` : Prisma.empty;
+}
+
+@Injectable()
+export class IniciativaListagemQuery implements IniciativaLeituraPort {
+  constructor(private readonly host: PrismaTransactionHost) {}
+
+  async listar(filtro: FiltroLeitura): Promise<{ linhas: LinhaResumo[]; total: number }> {
+    const where = condicoes(filtro);
+    const offset = (filtro.page - 1) * filtro.limit;
+    const [linhas, total] = await Promise.all([
+      this.host.client.$queryRaw<LinhaResumo[]>`
+        SELECT ${COLUNAS_RESUMO} ${JUNCOES} ${where} ${ordenacao(filtro.ordenar)}
+        LIMIT ${filtro.limit} OFFSET ${offset}`,
+      this.host.client.$queryRaw<{ total: number }[]>`
+        SELECT count(*)::int AS total ${JUNCOES} ${where}`,
+    ]);
+    return { linhas, total: total[0]?.total ?? 0 };
+  }
+
+  async contagemPorStatus(autorId: string): Promise<Partial<Record<StatusIniciativa, number>>> {
+    const linhas = await this.host.client.$queryRaw<{ status: StatusIniciativa; total: number }[]>`
+      SELECT s.code AS status, count(*)::int AS total
+      FROM iniciativas i JOIN iniciativas_status s ON s.id = i.status_id
+      WHERE i.autor_id = ${autorId}
+      GROUP BY s.code`;
+    return Object.fromEntries(linhas.map((linha) => [linha.status, linha.total]));
+  }
+
+  async contarPorStatus(status: StatusIniciativa): Promise<number> {
+    const linhas = await this.host.client.$queryRaw<{ total: number }[]>`
+      SELECT count(*)::int AS total
+      FROM iniciativas i JOIN iniciativas_status s ON s.id = i.status_id
+      WHERE s.code = ${status}`;
+    return linhas[0]?.total ?? 0;
+  }
+
+  async obterLinha(id: string): Promise<LinhaDetalhe | null> {
+    const linhas = await this.host.client.$queryRaw<LinhaDetalhe[]>`
+      SELECT ${COLUNAS_RESUMO},
+        i.detalhe,
+        i.hora_inicio AS "horaInicio",
+        i.hora_fim AS "horaFim",
+        i.organizadores,
+        i.membros,
+        i.participantes,
+        i.decisor_id AS "decisorId",
+        i.justificativa
+      ${JUNCOES}
+      WHERE i.id = ${id}::uuid`;
+    return linhas[0] ?? null;
+  }
+
+  async historico(id: string): Promise<LinhaHistorico[]> {
+    return this.host.client.$queryRaw<LinhaHistorico[]>`
+      SELECT h.id, h.ciclo, ds.code AS de, ps.code AS para, h.por, h.nota, h.justificativa,
+        h.ocorreu_em AS "ocorreuEm"
+      FROM iniciativas_historico h
+      LEFT JOIN iniciativas_status ds ON ds.id = h.de_id
+      JOIN iniciativas_status ps ON ps.id = h.para_id
+      WHERE h.iniciativa_id = ${id}::uuid
+      ORDER BY h.ocorreu_em ASC, h.seq ASC`;
+  }
+
+  async aprovadasParaCalendario(filtro: {
+    de: string;
+    ate: string;
+    tipos?: TipoIniciativa[];
+    autorId?: string;
+  }): Promise<LinhaCalendario[]> {
+    const extras: Prisma.Sql[] = [];
+    if (filtro.tipos && filtro.tipos.length > 0) {
+      extras.push(Prisma.sql`AND t.code IN (${Prisma.join(filtro.tipos)})`);
+    }
+    if (filtro.autorId) extras.push(Prisma.sql`AND i.autor_id = ${filtro.autorId}`);
+    return this.host.client.$queryRaw<LinhaCalendario[]>`
+      SELECT i.id, i.titulo, t.code AS tipo, i.resumo,
+        to_char(i.inicio, 'YYYY-MM-DD') AS inicio,
+        to_char(i.fim, 'YYYY-MM-DD') AS fim,
+        i.hora_inicio AS "horaInicio", i.hora_fim AS "horaFim",
+        p.code AS periodicidade, i.espaco, i.organizadores, i.autor_id AS "autorId"
+      FROM iniciativas i
+      JOIN iniciativas_status s ON s.id = i.status_id
+      JOIN iniciativas_tipos t ON t.id = i.tipo_id
+      JOIN iniciativas_periodicidades p ON p.id = i.periodicidade_id
+      WHERE s.code = 'APROVADA'
+        AND i.inicio < ${filtro.ate}::date AND i.fim >= ${filtro.de}::date
+        ${extras.length > 0 ? Prisma.join(extras, ' ') : Prisma.empty}
+      ORDER BY i.inicio ASC, i.id ASC`;
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/persistence/prisma-iniciativa.repository.ts =====
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
+import { ConcorrenciaError } from '../../domain/errors/iniciativas.errors';
+import { Iniciativa, type IniciativaProps } from '../../domain/iniciativa';
+import type { IniciativaRepository } from '../../domain/ports/iniciativa.repository';
+import type { StatusIniciativa } from '../../domain/status';
+import type { Periodicidade, TipoIniciativa } from '../../domain/tipos';
+import { DadosIniciativa } from '../../domain/value-objects/dados-iniciativa';
+
+type LinhaIniciativa = Prisma.IniciativaGetPayload<{
+  include: { tipo: true; periodicidade: true; status: true };
+}>;
+
+const dia = (data: Date): string => data.toISOString().slice(0, 10);
+
+function paraDominio(linha: LinhaIniciativa): Iniciativa {
+  const props: IniciativaProps = {
+    id: linha.id,
+    autorId: linha.autorId,
+    dados: DadosIniciativa.criar({
+      tipo: linha.tipo.code as TipoIniciativa,
+      titulo: linha.titulo,
+      resumo: linha.resumo,
+      detalhe: linha.detalhe,
+      inicio: dia(linha.inicio),
+      fim: dia(linha.fim),
+      horaInicio: linha.horaInicio,
+      horaFim: linha.horaFim,
+      periodicidade: linha.periodicidade.code as Periodicidade,
+      espaco: linha.espaco,
+      organizadores: linha.organizadores,
+      membros: linha.membros,
+      participantes: linha.participantes,
+    }),
+    comVotacao: linha.comVotacao,
+    status: linha.status.code as StatusIniciativa,
+    ciclo: linha.ciclo,
+    fimRefinamento: linha.fimRefinamento,
+    fimVotacao: linha.fimVotacao,
+    justificativa: linha.justificativa,
+    decisorId: linha.decisorId,
+    decididaEm: linha.decididaEm,
+    version: linha.version,
+    criadaEm: linha.criadaEm,
+  };
+  return Iniciativa.reconstituir(props);
+}
+
+/** Campos escalares gravados em criação e atualização (as relações entram por `connect`). */
+function camposDe(iniciativa: Iniciativa) {
+  const { dados } = iniciativa;
+  return {
+    titulo: dados.titulo,
+    resumo: dados.resumo,
+    detalhe: dados.detalhe,
+    inicio: new Date(dados.inicio),
+    fim: new Date(dados.fim),
+    horaInicio: dados.horaInicio,
+    horaFim: dados.horaFim,
+    espaco: dados.espaco,
+    organizadores: dados.organizadores,
+    membros: dados.membros,
+    participantes: dados.participantes,
+    comVotacao: iniciativa.comVotacao,
+    ciclo: iniciativa.ciclo,
+    fimRefinamento: iniciativa.fimRefinamento,
+    fimVotacao: iniciativa.fimVotacao,
+    justificativa: iniciativa.justificativa,
+    decisorId: iniciativa.decisorId,
+    decididaEm: iniciativa.decididaEm,
+    tipo: { connect: { code: dados.tipo } },
+    periodicidade: { connect: { code: dados.periodicidade } },
+    status: { connect: { code: iniciativa.status } },
+  };
+}
+
+@Injectable()
+export class PrismaIniciativaRepository implements IniciativaRepository {
+  /** Lookup de status (code → id), pequeno e imutável: carregado uma vez. */
+  private statusIds?: Map<string, number>;
+
+  constructor(private readonly host: PrismaTransactionHost) {}
+
+  async buscarPorId(id: string): Promise<Iniciativa | null> {
+    const linha = await this.host.client.iniciativa.findUnique({
+      where: { id },
+      include: { tipo: true, periodicidade: true, status: true },
+    });
+    return linha ? paraDominio(linha) : null;
+  }
+
+  async criar(iniciativa: Iniciativa): Promise<void> {
+    await this.host.client.iniciativa.create({
+      data: {
+        id: iniciativa.id,
+        autorId: iniciativa.autorId,
+        criadaEm: iniciativa.criadaEm,
+        version: 0,
+        ...camposDe(iniciativa),
+      },
+    });
+    await this.gravarHistorico(iniciativa);
+    iniciativa.confirmarGravacao();
+  }
+
+  async salvar(iniciativa: Iniciativa): Promise<void> {
+    try {
+      await this.host.client.iniciativa.update({
+        where: { id: iniciativa.id, version: iniciativa.version },
+        data: { ...camposDe(iniciativa), version: { increment: 1 } },
+      });
+    } catch (erro) {
+      // P2025: nenhuma linha com esse `id` e `version` (outra gravação chegou antes).
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2025') {
+        throw new ConcorrenciaError();
+      }
+      throw erro;
+    }
+    await this.gravarHistorico(iniciativa);
+    iniciativa.confirmarGravacao();
+  }
+
+  async idsComPrazoVencido(agora: Date, limite: number): Promise<string[]> {
+    const linhas = await this.host.client.iniciativa.findMany({
+      where: {
+        OR: [
+          { status: { code: 'EM_ANDAMENTO' }, fimRefinamento: { lte: agora } },
+          { status: { code: 'EM_VOTACAO' }, fimVotacao: { lte: agora } },
+        ],
+      },
+      select: { id: true },
+      orderBy: { criadaEm: 'asc' },
+      take: limite,
+    });
+    return linhas.map((linha) => linha.id);
+  }
+
+  private async gravarHistorico(iniciativa: Iniciativa): Promise<void> {
+    const transicoes = iniciativa.novasTransicoes();
+    if (transicoes.length === 0) return;
+    const ids = await this.idsDeStatus();
+    await this.host.client.transicaoHistorico.createMany({
+      data: transicoes.map((t) => ({
+        iniciativaId: iniciativa.id,
+        ciclo: t.ciclo,
+        deId: t.de ? this.idDe(ids, t.de) : null,
+        paraId: this.idDe(ids, t.para),
+        por: t.por,
+        nota: t.nota,
+        justificativa: t.justificativa,
+        ocorreuEm: t.ocorreuEm,
+      })),
+    });
+  }
+
+  private idDe(ids: Map<string, number>, code: string): number {
+    const id = ids.get(code);
+    if (id === undefined) throw new Error(`Status "${code}" não existe em iniciativas_status.`);
+    return id;
+  }
+
+  private async idsDeStatus(): Promise<Map<string, number>> {
+    if (!this.statusIds) {
+      const linhas = await this.host.client.statusIniciativa.findMany();
+      this.statusIds = new Map(linhas.map((linha) => [linha.code, linha.id]));
+    }
+    return this.statusIds;
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/persistence/prisma-tipo.repository.ts =====
+import { Injectable } from '@nestjs/common';
+import { type TipoIniciativa as LinhaTipo, Prisma } from '@prisma/client';
+import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
+import { TipoEmUsoError } from '../../domain/errors/iniciativas.errors';
+import type { AutorRegistro, TipoRepository } from '../../domain/ports/tipo.repository';
+import { type RegistroTipo, TipoDeIniciativa } from '../../domain/tipo-de-iniciativa';
+
+const paraDominio = (linha: LinhaTipo): TipoDeIniciativa =>
+  TipoDeIniciativa.reconstituir({
+    id: linha.id,
+    code: linha.code,
+    nome: linha.label,
+    cor: linha.cor,
+    ativo: linha.ativo,
+  });
+
+const json = (valor: object | null) =>
+  valor === null ? Prisma.DbNull : (valor as Prisma.InputJsonObject);
+
+@Injectable()
+export class PrismaTipoRepository implements TipoRepository {
+  /** Lookup das ações do log (code → id), pequeno e imutável: carregado uma vez. */
+  private acaoIds?: Map<string, number>;
+
+  constructor(private readonly host: PrismaTransactionHost) {}
+
+  async buscarPorId(id: number): Promise<TipoDeIniciativa | null> {
+    const linha = await this.host.client.tipoIniciativa.findUnique({ where: { id } });
+    return linha ? paraDominio(linha) : null;
+  }
+
+  async listar(): Promise<TipoDeIniciativa[]> {
+    const linhas = await this.host.client.tipoIniciativa.findMany({
+      orderBy: [{ label: 'asc' }, { id: 'asc' }],
+    });
+    return linhas.map(paraDominio);
+  }
+
+  async codigosAtivos(): Promise<string[]> {
+    const linhas = await this.host.client.tipoIniciativa.findMany({
+      where: { ativo: true },
+      select: { code: true },
+    });
+    return linhas.map((linha) => linha.code);
+  }
+
+  async contarIniciativas(): Promise<Map<number, number>> {
+    const grupos = await this.host.client.iniciativa.groupBy({
+      by: ['tipoId'],
+      _count: { _all: true },
+    });
+    return new Map(grupos.map((grupo) => [grupo.tipoId, grupo._count._all]));
+  }
+
+  async criar(tipo: TipoDeIniciativa, autor: AutorRegistro, agora: Date): Promise<number> {
+    const linha = await this.host.client.tipoIniciativa.create({
+      data: { code: tipo.code, label: tipo.nome, cor: tipo.cor, ativo: tipo.ativo },
+    });
+    await this.gravarLog(linha.id, tipo, tipo.pullRegistros(), autor, agora);
+    return linha.id;
+  }
+
+  async salvar(tipo: TipoDeIniciativa, autor: AutorRegistro, agora: Date): Promise<void> {
+    const registros = tipo.pullRegistros();
+    if (registros.length === 0) return;
+    await this.host.client.tipoIniciativa.update({
+      where: { id: tipo.id },
+      data: { label: tipo.nome, cor: tipo.cor, ativo: tipo.ativo },
+    });
+    await this.gravarLog(tipo.id, tipo, registros, autor, agora);
+  }
+
+  async excluir(
+    tipo: TipoDeIniciativa,
+    registro: RegistroTipo,
+    autor: AutorRegistro,
+    agora: Date,
+  ): Promise<void> {
+    // O log é gravado antes, ainda com o `tipoId`; a FK `SET NULL` o desliga na exclusão.
+    await this.gravarLog(tipo.id, tipo, [registro], autor, agora);
+    try {
+      await this.host.client.tipoIniciativa.delete({ where: { id: tipo.id } });
+    } catch (erro) {
+      // P2003: a FK de `iniciativas.tipo_id` barrou (alguém usou o tipo nesse meio-tempo).
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2003') {
+        throw new TipoEmUsoError();
+      }
+      throw erro;
+    }
+  }
+
+  private async gravarLog(
+    tipoId: number,
+    tipo: TipoDeIniciativa,
+    registros: RegistroTipo[],
+    autor: AutorRegistro,
+    agora: Date,
+  ): Promise<void> {
+    if (registros.length === 0) return;
+    const acoes = await this.acoes();
+    await this.host.client.tipoIniciativaLog.createMany({
+      data: registros.map((registro) => ({
+        tipoId,
+        tipoCode: tipo.code,
+        tipoLabel: tipo.nome,
+        acaoId: acoes.get(registro.acao) as number,
+        por: autor.id,
+        porNome: autor.nome,
+        antes: json(registro.antes),
+        depois: json(registro.depois),
+        ocorreuEm: agora,
+      })),
+    });
+  }
+
+  private async acoes(): Promise<Map<string, number>> {
+    if (!this.acaoIds) {
+      const linhas = await this.host.client.acaoTipoIniciativa.findMany();
+      this.acaoIds = new Map(linhas.map((linha) => [linha.code, linha.id]));
+    }
+    return this.acaoIds;
+  }
+}
+
+// ===== src/modules/iniciativas/infrastructure/scheduler/transicoes.job.ts =====
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { IniciativasFacade } from '../../application/iniciativas.facade';
+
+/**
+ * Job das transições por prazo (RN-06). A expressão cron e o fuso vêm do ambiente
+ * (`TRANSICOES_CRON`, `APP_TIMEZONE`), lidos quando o módulo é carregado: `main.ts` carrega
+ * o `.env` antes de importar a aplicação. Cada transição é idempotente e segura com várias
+ * instâncias (concorrência otimista na iniciativa).
+ */
+@Injectable()
+export class TransicoesJob {
+  private readonly logger = new Logger(TransicoesJob.name);
+  private emExecucao = false;
+
+  constructor(private readonly iniciativas: IniciativasFacade) {}
+
+  @Cron(process.env.TRANSICOES_CRON?.trim() || '*/1 * * * *', {
+    name: 'iniciativas-transicoes',
+    timeZone: process.env.APP_TIMEZONE?.trim() || 'America/Recife',
+  })
+  async executar(): Promise<void> {
+    if (this.emExecucao) return;
+    this.emExecucao = true;
+    try {
+      const processadas = await this.iniciativas.aplicarPrazosVencidos();
+      if (processadas > 0)
+        this.logger.log(`${processadas} iniciativa(s) com prazo vencido processada(s).`);
+    } catch (erro) {
+      this.logger.error(
+        'Falha ao aplicar as transições por prazo.',
+        erro instanceof Error ? erro.stack : erro,
+      );
+    } finally {
+      this.emExecucao = false;
+    }
+  }
+
+  /** Executa uma rodada agora e devolve quantas iniciativas processou (usado nos testes). */
+  executarAgora(): Promise<number> {
+    return this.iniciativas.aplicarPrazosVencidos();
+  }
+}
+
+// ===== src/modules/iniciativas/iniciativas.module.ts =====
+import { forwardRef, Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { Clock } from '@/shared/domain/clock';
+import type { TransacaoPort } from '@/shared/domain/transacao.port';
+import { TransacaoAdapter } from '@/shared/infrastructure/transacao.adapter';
+import { CLOCK } from '@/shared/shared.tokens';
+import { DivulgacaoModule } from '../divulgacao/divulgacao.module';
+import { IdentidadeModule } from '../identidade/identidade.module';
+import { RefinamentoModule } from '../refinamento/refinamento.module';
+import { VotacaoModule } from '../votacao/votacao.module';
+import { IniciativasFacade } from './application/iniciativas.facade';
+import type { EventosPort } from './application/ports/eventos.port';
+import type { GoogleAgendaPort } from './application/ports/google-agenda.port';
+import type { IniciativaLeituraPort } from './application/ports/iniciativa-leitura.port';
+import type { SugestoesPort } from './application/ports/sugestoes.port';
+import type { UsuariosPort } from './application/ports/usuarios.port';
+import type { VotosPort } from './application/ports/votos.port';
+import { ConsultasIniciativas } from './application/queries/consultas-iniciativas';
+import { AlterarDatasIniciativa } from './application/use-cases/alterar-datas-iniciativa';
+import { AlterarIniciativa } from './application/use-cases/alterar-iniciativa';
+import { AplicarPrazosVencidos } from './application/use-cases/aplicar-prazos-vencidos';
+import { CarregarComPrazos } from './application/use-cases/carregar-com-prazos';
+import { DecidirIniciativa } from './application/use-cases/decidir-iniciativa';
+import { EditarIniciativa } from './application/use-cases/editar-iniciativa';
+import { RessubmeterIniciativa } from './application/use-cases/ressubmeter-iniciativa';
+import { SubmeterIniciativa } from './application/use-cases/submeter-iniciativa';
+import {
+  AlterarTipo,
+  CadastrarTipo,
+  ExcluirTipo,
+  ListarTipos,
+} from './application/use-cases/tipos-iniciativa';
+import type { IniciativaRepository } from './domain/ports/iniciativa.repository';
+import type { PrazosConfig } from './domain/ports/prazos-config';
+import type { TipoRepository } from './domain/ports/tipo.repository';
+import { EventosAdapter } from './infrastructure/adapters/eventos.adapter';
+import { GoogleAgendaAdapter } from './infrastructure/adapters/google-agenda.adapter';
+import { SugestoesAdapter } from './infrastructure/adapters/sugestoes.adapter';
+import { UsuariosAdapter } from './infrastructure/adapters/usuarios.adapter';
+import { VotosAdapter } from './infrastructure/adapters/votos.adapter';
+import { prazosDaConfiguracao } from './infrastructure/config/prazos.provider';
+import { IniciativaListagemQuery } from './infrastructure/persistence/iniciativa-listagem.query';
+import { PrismaIniciativaRepository } from './infrastructure/persistence/prisma-iniciativa.repository';
+import { PrismaTipoRepository } from './infrastructure/persistence/prisma-tipo.repository';
+import { TransicoesJob } from './infrastructure/scheduler/transicoes.job';
+import {
+  EVENTOS_PORT,
+  GOOGLE_AGENDA_PORT,
+  INICIATIVA_LEITURA,
+  INICIATIVA_REPOSITORY,
+  PRAZOS_CONFIG,
+  SUGESTOES_PORT,
+  TIPO_REPOSITORY,
+  TRANSACAO_PORT,
+  USUARIOS_PORT,
+  VOTOS_PORT,
+} from './iniciativas.tokens';
+import { IniciativasController } from './presentation/http/iniciativas.controller';
+import { TiposIniciativaController } from './presentation/http/tipos-iniciativa.controller';
+
+@Module({
+  imports: [
+    IdentidadeModule,
+    forwardRef(() => RefinamentoModule),
+    forwardRef(() => VotacaoModule),
+    forwardRef(() => DivulgacaoModule),
+  ],
+  controllers: [IniciativasController, TiposIniciativaController],
+  providers: [
+    { provide: INICIATIVA_REPOSITORY, useClass: PrismaIniciativaRepository },
+    { provide: INICIATIVA_LEITURA, useClass: IniciativaListagemQuery },
+    { provide: TIPO_REPOSITORY, useClass: PrismaTipoRepository },
+    { provide: USUARIOS_PORT, useClass: UsuariosAdapter },
+    { provide: SUGESTOES_PORT, useClass: SugestoesAdapter },
+    { provide: VOTOS_PORT, useClass: VotosAdapter },
+    { provide: GOOGLE_AGENDA_PORT, useClass: GoogleAgendaAdapter },
+    { provide: TRANSACAO_PORT, useClass: TransacaoAdapter },
+    { provide: EVENTOS_PORT, useClass: EventosAdapter },
+    { provide: PRAZOS_CONFIG, useFactory: prazosDaConfiguracao, inject: [ConfigService] },
+    {
+      provide: CarregarComPrazos,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
+        clock: Clock,
+        prazos: PrazosConfig,
+      ) => new CarregarComPrazos(repositorio, transacao, eventos, clock, prazos),
+      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CLOCK, PRAZOS_CONFIG],
+    },
+    {
+      provide: SubmeterIniciativa,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
+        clock: Clock,
+        prazos: PrazosConfig,
+        tipos: TipoRepository,
+      ) => new SubmeterIniciativa(repositorio, transacao, eventos, clock, prazos, tipos),
+      inject: [
+        INICIATIVA_REPOSITORY,
+        TRANSACAO_PORT,
+        EVENTOS_PORT,
+        CLOCK,
+        PRAZOS_CONFIG,
+        TIPO_REPOSITORY,
+      ],
+    },
+    {
+      provide: AlterarIniciativa,
+      useFactory: (
+        repositorio: IniciativaRepository,
+        transacao: TransacaoPort,
+        eventos: EventosPort,
+        carregar: CarregarComPrazos,
+      ) => new AlterarIniciativa(repositorio, transacao, eventos, carregar),
+      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CarregarComPrazos],
+    },
+    {
+      provide: EditarIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock, tipos: TipoRepository) =>
+        new EditarIniciativa(alterar, clock, tipos),
+      inject: [AlterarIniciativa, CLOCK, TIPO_REPOSITORY],
+    },
+    {
+      provide: RessubmeterIniciativa,
+      useFactory: (
+        alterar: AlterarIniciativa,
+        clock: Clock,
+        prazos: PrazosConfig,
+        tipos: TipoRepository,
+      ) => new RessubmeterIniciativa(alterar, clock, prazos, tipos),
+      inject: [AlterarIniciativa, CLOCK, PRAZOS_CONFIG, TIPO_REPOSITORY],
+    },
+    {
+      provide: DecidirIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new DecidirIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
+    },
+    {
+      provide: ListarTipos,
+      useFactory: (tipos: TipoRepository) => new ListarTipos(tipos),
+      inject: [TIPO_REPOSITORY],
+    },
+    {
+      provide: CadastrarTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new CadastrarTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: AlterarTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new AlterarTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: ExcluirTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new ExcluirTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: AlterarDatasIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new AlterarDatasIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
+    },
+    {
+      provide: ConsultasIniciativas,
+      useFactory: (
+        leitura: IniciativaLeituraPort,
+        usuarios: UsuariosPort,
+        sugestoes: SugestoesPort,
+        votos: VotosPort,
+        googleAgenda: GoogleAgendaPort,
+        carregar: CarregarComPrazos,
+        clock: Clock,
+      ) =>
+        new ConsultasIniciativas({
+          leitura,
+          usuarios,
+          sugestoes,
+          votos,
+          googleAgenda,
+          carregar,
+          clock,
+        }),
+      inject: [
+        INICIATIVA_LEITURA,
+        USUARIOS_PORT,
+        SUGESTOES_PORT,
+        VOTOS_PORT,
+        GOOGLE_AGENDA_PORT,
+        CarregarComPrazos,
+        CLOCK,
+      ],
+    },
+    {
+      provide: AplicarPrazosVencidos,
+      useFactory: (repositorio: IniciativaRepository, carregar: CarregarComPrazos, clock: Clock) =>
+        new AplicarPrazosVencidos(repositorio, carregar, clock),
+      inject: [INICIATIVA_REPOSITORY, CarregarComPrazos, CLOCK],
+    },
+    {
+      provide: IniciativasFacade,
+      useFactory: (
+        submeter: SubmeterIniciativa,
+        editar: EditarIniciativa,
+        ressubmeter: RessubmeterIniciativa,
+        decidir: DecidirIniciativa,
+        consultas: ConsultasIniciativas,
+        carregar: CarregarComPrazos,
+        job: AplicarPrazosVencidos,
+        alterarDatas: AlterarDatasIniciativa,
+      ) =>
+        new IniciativasFacade(
+          submeter,
+          editar,
+          ressubmeter,
+          decidir,
+          consultas,
+          carregar,
+          job,
+          alterarDatas,
+        ),
+      inject: [
+        SubmeterIniciativa,
+        EditarIniciativa,
+        RessubmeterIniciativa,
+        DecidirIniciativa,
+        ConsultasIniciativas,
+        CarregarComPrazos,
+        AplicarPrazosVencidos,
+        AlterarDatasIniciativa,
+      ],
+    },
+    TransicoesJob,
+  ],
+  exports: [IniciativasFacade, TransicoesJob],
+})
+export class IniciativasModule {}
+
+// ===== src/modules/iniciativas/iniciativas.tokens.ts =====
+export const INICIATIVA_REPOSITORY = Symbol('INICIATIVA_REPOSITORY');
+export const INICIATIVA_LEITURA = Symbol('INICIATIVA_LEITURA');
+export const USUARIOS_PORT = Symbol('INICIATIVAS_USUARIOS_PORT');
+export const SUGESTOES_PORT = Symbol('INICIATIVAS_SUGESTOES_PORT');
+export const VOTOS_PORT = Symbol('INICIATIVAS_VOTOS_PORT');
+export const GOOGLE_AGENDA_PORT = Symbol('INICIATIVAS_GOOGLE_AGENDA_PORT');
+export const TRANSACAO_PORT = Symbol('INICIATIVAS_TRANSACAO_PORT');
+export const EVENTOS_PORT = Symbol('INICIATIVAS_EVENTOS_PORT');
+export const TIPO_REPOSITORY = Symbol('INICIATIVAS_TIPO_REPOSITORY');
+export const PRAZOS_CONFIG = Symbol('PRAZOS_CONFIG');
+
+// ===== src/modules/iniciativas/presentation/http/iniciativas.controller.ts =====
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AccessRole } from '@/common/auth/access-role.enum';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { Roles } from '@/common/auth/decorators/roles.decorator';
+import type {
+  AtorDto,
+  DadosIniciativaInput,
+  DatasIniciativaInput,
+} from '../../application/dto/iniciativa.dto';
+import { IniciativasFacade } from '../../application/iniciativas.facade';
+import {
+  DadosIniciativaDto,
+  DatasIniciativaDto,
+  ListagemQueryDto,
+  MinhasQueryDto,
+} from './iniciativas.dto';
+
+function atorDe(user: CurrentUser): AtorDto {
+  return {
+    id: user.userId,
+    nome: user.nome,
+    ehComite: user.roles.includes(AccessRole.COMITE) || user.roles.includes(AccessRole.ADMIN),
+  };
+}
+
+function pagina<T>(items: T[], total: number, page: number, limit: number) {
+  return { items, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+}
+
+@ApiTags('Iniciativas')
+@ApiBearerAuth()
+@Controller({ path: 'iniciativas', version: '1' })
+export class IniciativasController {
+  constructor(private readonly iniciativas: IniciativasFacade) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Submeter uma iniciativa (abre o refinamento)' })
+  @ApiResponse({ status: 201, description: 'Iniciativa criada em Em andamento (detalhe)' })
+  @ApiResponse({
+    status: 422,
+    description: 'Campos inválidos (RN-01 e RN-02), com `errors` por campo',
+  })
+  async submeter(@Body() corpo: DadosIniciativaDto, @GetCurrentUser() user: CurrentUser) {
+    const id = await this.iniciativas.submeter(user.userId, corpo as DadosIniciativaInput);
+    return this.iniciativas.detalhe(id, atorDe(user));
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Listar iniciativas (filtros, ordenação e paginação no servidor)',
+    description:
+      'Ex.: `status=EM_VOTACAO&ordenar=relevancia` (início) e `status=EM_ANDAMENTO&ordenar=prazo`.',
+  })
+  @ApiResponse({ status: 200, description: 'Página de resumos de iniciativas' })
+  async listar(@Query() query: ListagemQueryDto) {
+    const { items, total } = await this.iniciativas.listar({
+      status: query.status,
+      tipo: query.tipo,
+      q: query.q,
+      ordenar: query.ordenar,
+      page: query.page,
+      limit: query.limit,
+    });
+    return pagina(items, total, query.page, query.limit);
+  }
+
+  // Rotas estáticas ANTES de `:id`, senão `minhas` e `contagens` seriam lidas como ids.
+
+  @Get('minhas')
+  @ApiOperation({ summary: 'Minhas iniciativas, com a contagem por status' })
+  @ApiResponse({ status: 200, description: 'Página de resumos e `meta.contagemPorStatus`' })
+  async minhas(@Query() query: MinhasQueryDto, @GetCurrentUser() user: CurrentUser) {
+    const resultado = await this.iniciativas.minhas(user.userId, {
+      status: query.status,
+      page: query.page,
+      limit: query.limit,
+    });
+    const base = pagina(resultado.items, resultado.total, query.page, query.limit);
+    return { ...base, meta: { ...base.meta, contagemPorStatus: resultado.contagemPorStatus } };
+  }
+
+  @Get('contagens')
+  @ApiOperation({ summary: 'Contagens para o menu (iniciativas em análise)' })
+  @ApiResponse({ status: 200, description: '`{ emAnalise }`' })
+  contagens() {
+    return this.iniciativas.contagens();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Detalhe da iniciativa, com permissões calculadas para o usuário' })
+  @ApiResponse({ status: 200, description: 'Detalhe (inclui `permissoes`, `meuVoto` e `decisao`)' })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  detalhe(@Param('id', ParseUUIDPipe) id: string, @GetCurrentUser() user: CurrentUser) {
+    return this.iniciativas.detalhe(id, atorDe(user));
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Editar a própria iniciativa (só em Em andamento)' })
+  @ApiResponse({ status: 200, description: 'Detalhe atualizado' })
+  @ApiResponse({ status: 403, description: 'Só o autor edita' })
+  @ApiResponse({ status: 409, description: 'Status não permite edição' })
+  @ApiResponse({ status: 422, description: 'Campos inválidos' })
+  async editar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() corpo: DadosIniciativaDto,
+    @GetCurrentUser() user: CurrentUser,
+  ) {
+    await this.iniciativas.editar(id, user.userId, corpo as DadosIniciativaInput);
+    return this.iniciativas.detalhe(id, atorDe(user));
+  }
+
+  @Patch(':id/datas')
+  @Roles(AccessRole.COMITE, AccessRole.ADMIN)
+  @ApiOperation({
+    summary: 'Alterar datas e horários de uma aprovada (comitê ou ADMIN)',
+    description:
+      'Muda início, término e horários da iniciativa; todas as ocorrências do calendário são recalculadas. A periodicidade não muda.',
+  })
+  @ApiResponse({ status: 200, description: 'Detalhe atualizado' })
+  @ApiResponse({ status: 403, description: 'Só o comitê ou o ADMIN' })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  @ApiResponse({ status: 409, description: 'Só iniciativas aprovadas' })
+  @ApiResponse({ status: 422, description: 'Datas ou horários inválidos, com `errors` por campo' })
+  async alterarDatas(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() corpo: DatasIniciativaDto,
+    @GetCurrentUser() user: CurrentUser,
+  ) {
+    const ator = atorDe(user);
+    await this.iniciativas.alterarDatas(id, ator, corpo as DatasIniciativaInput);
+    return this.iniciativas.detalhe(id, ator);
+  }
+
+  @Post(':id/ressubmissao')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Ressubmeter uma iniciativa reprovada (novo ciclo)' })
+  @ApiResponse({ status: 200, description: 'Detalhe no ciclo seguinte, em Em andamento' })
+  @ApiResponse({ status: 403, description: 'Só o autor ressubmete' })
+  @ApiResponse({ status: 409, description: 'Só iniciativas reprovadas' })
+  @ApiResponse({ status: 422, description: 'Campos inválidos' })
+  async ressubmeter(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() corpo: DadosIniciativaDto,
+    @GetCurrentUser() user: CurrentUser,
+  ) {
+    await this.iniciativas.ressubmeter(id, user.userId, corpo as DadosIniciativaInput);
+    return this.iniciativas.detalhe(id, atorDe(user));
+  }
+
+  @Get(':id/historico')
+  @ApiOperation({ summary: 'Histórico de transições de status (mais recente primeiro)' })
+  @ApiResponse({ status: 200, description: 'Lista de transições' })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  historico(@Param('id', ParseUUIDPipe) id: string) {
+    return this.iniciativas.historico(id);
+  }
+}
+
+// ===== src/modules/iniciativas/presentation/http/iniciativas.dto.ts =====
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+import { STATUS_INICIATIVA } from '../../domain/status';
+import { FORMATO_CODIGO_TIPO, PERIODICIDADES } from '../../domain/tipos';
+
+/**
+ * Corpo de `POST /iniciativas`, `PATCH /iniciativas/:id` e `POST /iniciativas/:id/ressubmissao`.
+ *
+ * O schema só garante os TIPOS; as regras de RN-01 e RN-02 (obrigatoriedade, limites, datas e
+ * horários) vivem no domínio (`DadosIniciativa`), que acumula as mensagens por campo e as
+ * devolve num 422 com `errors`. Por isso os campos são opcionais aqui.
+ */
+export const DadosIniciativaSchema = z.object({
+  tipo: z
+    .string()
+    .optional()
+    .describe('Código de um tipo ativo do cadastro (GET /tipos-iniciativa), por exemplo PALESTRA'),
+  titulo: z.string().optional().describe('Título (até 120 caracteres)'),
+  resumo: z.string().optional().describe('Descrição resumida (até 280 caracteres)'),
+  detalhe: z.string().optional().describe('Descrição detalhada (até 5000 caracteres)'),
+  inicio: z.string().optional().describe('Data de início (YYYY-MM-DD)'),
+  fim: z.string().optional().describe('Data de término (YYYY-MM-DD), igual ou posterior ao início'),
+  horaInicio: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Hora de início (HH:mm), junto com horaFim'),
+  horaFim: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Hora de término (HH:mm), posterior ao início'),
+  periodicidade: z
+    .string()
+    .optional()
+    .describe(`Periodicidade: ${PERIODICIDADES.join(', ')}`),
+  espaco: z.string().optional().describe('Espaço utilizado (até 200 caracteres)'),
+  organizadores: z.string().optional().describe('Organizadores, separados por vírgula (até 500)'),
+  membros: z.string().nullable().optional().describe('Membros (opcional, até 500)'),
+  participantes: z.number().optional().describe('Quantidade de participantes (1 a 100000)'),
+  comVotacao: z.boolean().optional().describe('Enviar para votação geral (padrão: true)'),
+});
+
+export class DadosIniciativaDto extends createZodDto(DadosIniciativaSchema) {}
+
+/**
+ * Corpo de `PATCH /iniciativas/:id/datas`. Como em `DadosIniciativaSchema`, só os tipos;
+ * as regras de data e hora (RN-02) ficam no domínio e voltam num 422 com `errors`.
+ */
+export const DatasIniciativaSchema = z.object({
+  inicio: z.string().optional().describe('Data de início (YYYY-MM-DD)'),
+  fim: z.string().optional().describe('Data de término (YYYY-MM-DD), igual ou posterior ao início'),
+  horaInicio: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Hora de início (HH:mm), junto com horaFim; null para dia inteiro'),
+  horaFim: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Hora de término (HH:mm), posterior ao início; null para dia inteiro'),
+});
+
+export class DatasIniciativaDto extends createZodDto(DatasIniciativaSchema) {}
+
+const ListagemBase = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(20),
+});
+
+export const ListagemQuerySchema = ListagemBase.extend({
+  status: z.enum(STATUS_INICIATIVA).optional().describe('Filtro por status'),
+  tipo: z.string().regex(FORMATO_CODIGO_TIPO).optional().describe('Filtro por código do tipo'),
+  q: z.string().optional().describe('Busca em título, resumo, organizadores e espaço'),
+  ordenar: z
+    .enum(['relevancia', 'prazo', 'recentes', 'inicio'])
+    .optional()
+    .describe('Ordenação (padrão: recentes)'),
+});
+
+export class ListagemQueryDto extends createZodDto(ListagemQuerySchema) {}
+
+export const MinhasQuerySchema = ListagemBase.extend({
+  status: z.enum(STATUS_INICIATIVA).optional().describe('Filtro por status'),
+});
+
+export class MinhasQueryDto extends createZodDto(MinhasQuerySchema) {}
+
+/** Resposta documentada no Swagger (a forma exata está em `application/dto/iniciativa.dto.ts`). */
+export const IdParamSchema = z.object({ id: z.string().uuid() });
+
+// ===== src/modules/iniciativas/presentation/http/tipos-iniciativa.controller.ts =====
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AccessRole } from '@/common/auth/access-role.enum';
+import type { CurrentUser } from '@/common/auth/current-user.interface';
+import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { Roles } from '@/common/auth/decorators/roles.decorator';
+import type {
+  AlterarTipoInput,
+  AtorTipoDto,
+  CadastrarTipoInput,
+} from '../../application/dto/tipo.dto';
+import {
+  AlterarTipo,
+  CadastrarTipo,
+  ExcluirTipo,
+  ListarTipos,
+} from '../../application/use-cases/tipos-iniciativa';
+import { AlterarTipoDto, CadastrarTipoDto, ListarTiposQueryDto } from './tipos-iniciativa.dto';
+
+function atorDe(user: CurrentUser): AtorTipoDto {
+  return {
+    id: user.userId,
+    nome: user.nome,
+    ehComite: user.roles.includes(AccessRole.COMITE) || user.roles.includes(AccessRole.ADMIN),
+  };
+}
+
+/**
+ * Cadastro de tipos de iniciativa. Qualquer autenticado lista (o formulário e os filtros
+ * precisam); só o comitê e o ADMIN cadastram, alteram e excluem. Toda mudança vai para o log
+ * de auditoria (`iniciativas_tipos_log`).
+ */
+@ApiTags('Tipos de iniciativa')
+@ApiBearerAuth()
+@Controller({ path: 'tipos-iniciativa', version: '1' })
+export class TiposIniciativaController {
+  constructor(
+    private readonly listarTipos: ListarTipos,
+    private readonly cadastrarTipo: CadastrarTipo,
+    private readonly alterarTipo: AlterarTipo,
+    private readonly excluirTipo: ExcluirTipo,
+  ) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar os tipos (ativos e inativos, ou só os ativos)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Tipos em ordem alfabética, com a contagem de iniciativas',
+  })
+  listar(@Query() query: ListarTiposQueryDto) {
+    return this.listarTipos.executar({ somenteAtivos: query.ativos });
+  }
+
+  @Post()
+  @Roles(AccessRole.COMITE, AccessRole.ADMIN)
+  @ApiOperation({ summary: 'Cadastrar um tipo (comitê ou ADMIN)' })
+  @ApiResponse({ status: 201, description: 'Tipo criado (ativo)' })
+  @ApiResponse({ status: 403, description: 'Só o comitê ou o ADMIN' })
+  @ApiResponse({ status: 422, description: 'Nome ou cor inválidos, ou nome repetido' })
+  cadastrar(@Body() corpo: CadastrarTipoDto, @GetCurrentUser() user: CurrentUser) {
+    return this.cadastrarTipo.executar(atorDe(user), corpo as CadastrarTipoInput);
+  }
+
+  @Patch(':id')
+  @Roles(AccessRole.COMITE, AccessRole.ADMIN)
+  @ApiOperation({
+    summary: 'Renomear, trocar a cor e/ou ativar e desativar um tipo (comitê ou ADMIN)',
+    description: 'Vale mesmo com iniciativas associadas. O código do tipo não muda.',
+  })
+  @ApiResponse({ status: 200, description: 'Tipo atualizado' })
+  @ApiResponse({ status: 403, description: 'Só o comitê ou o ADMIN' })
+  @ApiResponse({ status: 404, description: 'Tipo não encontrado' })
+  @ApiResponse({ status: 422, description: 'Nome ou cor inválidos, ou nome repetido' })
+  alterar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() corpo: AlterarTipoDto,
+    @GetCurrentUser() user: CurrentUser,
+  ) {
+    return this.alterarTipo.executar(id, atorDe(user), corpo as AlterarTipoInput);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @Roles(AccessRole.COMITE, AccessRole.ADMIN)
+  @ApiOperation({ summary: 'Excluir um tipo sem iniciativas associadas (comitê ou ADMIN)' })
+  @ApiResponse({ status: 204, description: 'Excluído' })
+  @ApiResponse({ status: 403, description: 'Só o comitê ou o ADMIN' })
+  @ApiResponse({ status: 404, description: 'Tipo não encontrado' })
+  @ApiResponse({ status: 409, description: 'Há iniciativas associadas ao tipo' })
+  async excluir(@Param('id', ParseIntPipe) id: number, @GetCurrentUser() user: CurrentUser) {
+    await this.excluirTipo.executar(id, atorDe(user));
+  }
+}
+
+// ===== src/modules/iniciativas/presentation/http/tipos-iniciativa.dto.ts =====
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
+
+/**
+ * Corpos do cadastro de tipos. Como nos outros DTOs, o schema só garante os TIPOS; as regras
+ * (obrigatório, tamanho, formato da cor, nome repetido) ficam no domínio e voltam num 422
+ * com `errors` por campo.
+ */
+export const CadastrarTipoSchema = z.object({
+  nome: z.string().optional().describe('Nome do tipo (até 60 caracteres), por exemplo "Palestra"'),
+  cor: z.string().optional().describe('Cor no formato #RRGGBB'),
+});
+
+export class CadastrarTipoDto extends createZodDto(CadastrarTipoSchema) {}
+
+export const AlterarTipoSchema = z.object({
+  nome: z.string().optional().describe('Novo nome (o código do tipo não muda)'),
+  cor: z.string().optional().describe('Nova cor, #RRGGBB'),
+  ativo: z.boolean().optional().describe('false desativa: some da seleção de novas iniciativas'),
+});
+
+export class AlterarTipoDto extends createZodDto(AlterarTipoSchema) {}
+
+export const ListarTiposQuerySchema = z.object({
+  ativos: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((valor) => valor === 'true')
+    .describe('true: só os tipos ativos (os que podem ser escolhidos)'),
+});
+
+export class ListarTiposQueryDto extends createZodDto(ListarTiposQuerySchema) {}

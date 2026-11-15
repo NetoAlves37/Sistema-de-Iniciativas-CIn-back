@@ -1,5 +1,5 @@
 import { ValidacaoError } from '@/shared/domain/domain-error';
-import { FORMATO_CODIGO_TIPO } from './tipos';
+import { FORMATO_CODIGO_TIPO } from '@/shared/domain/vocabulario-iniciativa';
 
 export const LIMITE_NOME_TIPO = 60;
 const FORMATO_COR = /^#[0-9A-Fa-f]{6}$/;

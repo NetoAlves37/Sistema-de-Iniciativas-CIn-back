@@ -1,0 +1,17 @@
+
+ RUN  v4.1.8 C:/Users/maria/SISTEMA DE INICIATIVAS/backend
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma\schema.prisma
+Datasource "db": PostgreSQL database "BD-SICIN-TEST", schema "public" at "localhost:5433"
+
+4 migrations found in prisma/migrations
+
+
+No pending migrations to apply.
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  16:02:05
+   Duration  4.43s (transform 663ms, setup 0ms, import 2.18s, tests 303ms, environment 0ms)
+

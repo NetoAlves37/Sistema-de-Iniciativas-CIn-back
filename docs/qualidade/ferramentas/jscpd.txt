@@ -1,0 +1,38 @@
+Clone found (typescript):
+ - src\modules\refinamento\infrastructure\adapters\iniciativa.adapter.ts [1:1 - 19:2] (18 lines, 182 tokens)
+   src\modules\votacao\infrastructure\adapters\iniciativa.adapter.ts [1:1 - 19:2]
+
+Clone found (typescript):
+ - src\modules\iniciativas\presentation\http\iniciativas.dto.ts [51:3 - 57:81] (6 lines, 73 tokens)
+   src\modules\iniciativas\presentation\http\iniciativas.dto.ts [21:3 - 27:58]
+
+Clone found (typescript):
+ - src\modules\iniciativas\presentation\http\iniciativas.controller.ts [7:16 - 18:10] (11 lines, 115 tokens)
+   src\modules\iniciativas\presentation\http\tipos-iniciativa.controller.ts [8:15 - 19:19]
+
+Clone found (typescript):
+ - src\modules\iniciativas\application\use-cases\editar-iniciativa.ts [11:34 - 21:24] (10 lines, 154 tokens)
+   src\modules\iniciativas\application\use-cases\ressubmeter-iniciativa.ts [13:42 - 23:29]
+
+Clone found (typescript):
+ - src\modules\divulgacao\application\dto\divulgacao.dto.ts [30:41 - 45:53] (15 lines, 97 tokens)
+   src\modules\iniciativas\application\ports\iniciativa-leitura.port.ts [49:34 - 64:7]
+
+Clone found (typescript):
+ - src\modules\avaliacao\presentation\http\avaliacao.controller.ts [8:16 - 17:9] (9 lines, 104 tokens)
+   src\modules\iniciativas\presentation\http\tipos-iniciativa.controller.ts [9:8 - 18:12]
+
+Clone found (typescript):
+ - src\modules\avaliacao\application\dto\avaliacao.dto.ts [18:27 - 35:55] (17 lines, 151 tokens)
+   src\modules\divulgacao\application\dto\divulgacao.dto.ts [12:82 - 29:60]
+
+┌────────────┬────────────────┬─────────────┬──────────────┬──────────────┬──────────────────┬───────────────────┐
+│ Format     │ Files analyzed │ Total lines │ Total tokens │ Clones found │ Duplicated lines │ Duplicated tokens │
+├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤
+│ typescript │ 120            │ 5925        │ 57352        │ 7            │ 86 (1.45%)       │ 876 (1.53%)       │
+├────────────┼────────────────┼─────────────┼──────────────┼──────────────┼──────────────────┼───────────────────┤
+│ Total:     │ 120            │ 5925        │ 57352        │ 7            │ 86 (1.45%)       │ 876 (1.53%)       │
+└────────────┴────────────────┴─────────────┴──────────────┴──────────────┴──────────────────┴───────────────────┘
+Found 7 clones.
+time: 355.066ms
+

@@ -4,7 +4,11 @@ import {
   type IniciativaProps,
   type Transicao,
 } from '@/modules/iniciativas/domain/iniciativa';
-import type { IniciativaRepository } from '@/modules/iniciativas/domain/ports/iniciativa.repository';
+import type {
+  FiltroDuplicidade,
+  IniciativaRepository,
+} from '@/modules/iniciativas/domain/ports/iniciativa.repository';
+import { STATUS_ATIVOS } from '@/modules/iniciativas/domain/status';
 
 function propsDe(iniciativa: Iniciativa): IniciativaProps {
   return {
@@ -53,6 +57,18 @@ export class IniciativaRepositoryEmMemoria implements IniciativaRepository {
     this.gravarHistorico(iniciativa);
     iniciativa.confirmarGravacao();
     this.iniciativas.set(iniciativa.id, propsDe(iniciativa));
+  }
+
+  async existeAtivaIgual(filtro: FiltroDuplicidade): Promise<boolean> {
+    const titulo = filtro.titulo.toLocaleLowerCase('pt-BR');
+    return [...this.iniciativas.values()].some(
+      (p) =>
+        p.autorId === filtro.autorId &&
+        STATUS_ATIVOS.includes(p.status) &&
+        p.dados.titulo.toLocaleLowerCase('pt-BR') === titulo &&
+        p.dados.inicio === filtro.inicio &&
+        p.dados.horaInicio === filtro.horaInicio,
+    );
   }
 
   async idsComPrazoVencido(agora: Date, limite: number): Promise<string[]> {

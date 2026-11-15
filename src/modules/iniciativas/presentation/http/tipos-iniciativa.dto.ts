@@ -1,5 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
+import { LIMITE_NOME_TIPO } from '../../domain/tipo-de-iniciativa';
 
 /**
  * Corpos do cadastro de tipos. Como nos outros DTOs, o schema só garante os TIPOS; as regras
@@ -7,7 +8,10 @@ import { z } from 'zod';
  * com `errors` por campo.
  */
 export const CadastrarTipoSchema = z.object({
-  nome: z.string().optional().describe('Nome do tipo (até 60 caracteres), por exemplo "Palestra"'),
+  nome: z
+    .string()
+    .optional()
+    .describe(`Nome do tipo (até ${LIMITE_NOME_TIPO} caracteres), por exemplo "Palestra"`),
   cor: z.string().optional().describe('Cor no formato #RRGGBB'),
 });
 

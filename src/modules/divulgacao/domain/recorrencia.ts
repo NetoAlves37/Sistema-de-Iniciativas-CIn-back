@@ -1,5 +1,5 @@
+import type { Periodicidade } from '@/shared/domain/vocabulario-iniciativa';
 import { diaDoMes, diaParaNumero, diasNoMes, numeroParaDia, somarDias } from './datas';
-import type { Periodicidade } from './periodicidade';
 
 /** O que a recorrência precisa saber de uma iniciativa aprovada. */
 export interface PeriodoRecorrente {

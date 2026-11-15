@@ -2,7 +2,9 @@ import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } fr
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { CurrentUser } from '@/common/auth/current-user.interface';
 import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
+import { LIMITE_PADRAO_COMENTARIOS } from '../../application/dto/comentario.dto';
 import { RefinamentoFacade } from '../../application/refinamento.facade';
+import { TEXTO_MAXIMO } from '../../domain/comentario';
 import {
   ComentarioResponseDto,
   CriarComentarioDto,
@@ -19,8 +21,7 @@ export class ComentariosController {
   @Get()
   @ApiOperation({
     summary: 'Lista os comentários da iniciativa',
-    description:
-      'Ciclo mais recente primeiro e, dentro do ciclo, do mais antigo para o mais novo. Limite padrão: 50.',
+    description: `Ciclo mais recente primeiro e, dentro do ciclo, do mais antigo para o mais novo. Limite padrão: ${LIMITE_PADRAO_COMENTARIOS}.`,
   })
   @ApiResponse({ status: 200, type: PaginaDeComentariosResponseDto })
   @ApiResponse({ status: 401, description: 'Não autenticado' })
@@ -43,7 +44,10 @@ export class ComentariosController {
   @ApiResponse({ status: 401, description: 'Não autenticado' })
   @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
   @ApiResponse({ status: 409, description: 'A fase de sugestões terminou' })
-  @ApiResponse({ status: 422, description: 'Texto vazio ou com mais de 1000 caracteres' })
+  @ApiResponse({
+    status: 422,
+    description: `Texto vazio ou com mais de ${TEXTO_MAXIMO} caracteres`,
+  })
   comentar(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: CriarComentarioDto,

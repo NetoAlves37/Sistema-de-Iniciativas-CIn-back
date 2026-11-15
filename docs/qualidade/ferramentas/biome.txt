@@ -1,0 +1,46 @@
+Biome 2.4.16 - regras de qualidade rodadas so para a analise (sem alterar o biome.json)
+Data: 15/11/2026. Commit: b1352d3. Escopo: src/modules e src/shared, sem *.spec.ts e sem pastas testing/.
+Limites padrao do Biome: complexidade cognitiva 15, 50 linhas por funcao, 4 parametros.
+
+Comandos:
+  npx biome lint --only=complexity/noExcessiveCognitiveComplexity --max-diagnostics=500 --reporter=json src/modules src/shared
+  npx biome lint --only=complexity/noExcessiveLinesPerFunction --max-diagnostics=500 --reporter=json src/modules src/shared
+  npx biome lint --only=complexity/useMaxParams --max-diagnostics=500 --reporter=json src/modules src/shared
+  npx biome lint --only=style/noMagicNumbers --max-diagnostics=500 --reporter=json src/modules src/shared
+
+== noExcessiveCognitiveComplexity: 1
+   src/modules/iniciativas/domain/value-objects/dados-iniciativa.ts:85 | Excessive complexity of 42 detected (max: 15).
+== noExcessiveLinesPerFunction: 1
+   src/modules/iniciativas/domain/value-objects/dados-iniciativa.ts:85 | This function has too many lines (84). Maximum allowed is 50.
+== noMagicNumbers: 17
+   src/modules/avaliacao/presentation/http/avaliacao.controller.ts:57 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/divulgacao/domain/datas.ts:25 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/divulgacao/domain/recorrencia.ts:31 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/divulgacao/domain/recorrencia.ts:33 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/identidade/application/identidade.facade.ts:12 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/identidade/application/identidade.facade.ts:12 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/iniciativas/domain/ports/prazos-config.ts:7 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/iniciativas/domain/tipo-de-iniciativa.ts:50 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/iniciativas/presentation/http/iniciativas.controller.ts:147 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/iniciativas/presentation/http/iniciativas.dto.ts:69 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/iniciativas/presentation/http/iniciativas.dto.ts:69 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/iniciativas/presentation/http/tipos-iniciativa.controller.ts:94 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/refinamento/presentation/http/comentario.dto.ts:16 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/refinamento/presentation/http/comentario.dto.ts:16 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/refinamento/presentation/http/comentarios.controller.ts:37 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/votacao/domain/relevancia.ts:13 | Magic number detected. Extract it to a constant with a meaningful name.
+   src/modules/votacao/presentation/http/voto.controller.ts:15 | Magic number detected. Extract it to a constant with a meaningful name.
+== useMaxParams: 13
+   src/modules/iniciativas/application/iniciativas.facade.ts:50 | Function has 8 parameters, but only 4 are allowed.
+   src/modules/iniciativas/application/use-cases/carregar-com-prazos.ts:21 | Function has 5 parameters, but only 4 are allowed.
+   src/modules/iniciativas/application/use-cases/submeter-iniciativa.ts:13 | Function has 6 parameters, but only 4 are allowed.
+   src/modules/iniciativas/domain/events/iniciativa.events.ts:33 | Function has 5 parameters, but only 4 are allowed.
+   src/modules/iniciativas/domain/iniciativa.ts:108 | Function has 5 parameters, but only 4 are allowed.
+   src/modules/iniciativas/domain/iniciativa.ts:338 | Function has 5 parameters, but only 4 are allowed.
+   src/modules/iniciativas/domain/iniciativa.ts:418 | Function has 6 parameters, but only 4 are allowed.
+   src/modules/iniciativas/domain/value-objects/dados-iniciativa.ts:62 | Function has 13 parameters, but only 4 are allowed.
+   src/modules/iniciativas/infrastructure/persistence/prisma-tipo.repository.ts:92 | Function has 5 parameters, but only 4 are allowed.
+   src/modules/iniciativas/iniciativas.module.ts:82 | Function has 5 parameters, but only 4 are allowed.
+   src/modules/iniciativas/iniciativas.module.ts:93 | Function has 6 parameters, but only 4 are allowed.
+   src/modules/iniciativas/iniciativas.module.ts:173 | Function has 7 parameters, but only 4 are allowed.
+   src/modules/iniciativas/iniciativas.module.ts:209 | Function has 8 parameters, but only 4 are allowed.

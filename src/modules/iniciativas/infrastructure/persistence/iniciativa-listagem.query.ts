@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { TipoIniciativa } from '@/shared/domain/vocabulario-iniciativa';
 import { PrismaTransactionHost } from '@/shared/infrastructure/prisma-transaction-host';
 import type {
   FiltroLeitura,
@@ -10,7 +11,6 @@ import type {
   LinhaResumo,
 } from '../../application/ports/iniciativa-leitura.port';
 import type { StatusIniciativa } from '../../domain/status';
-import type { TipoIniciativa } from '../../domain/tipos';
 
 /**
  * Modelo de leitura das iniciativas, em SQL.
