@@ -183,6 +183,172 @@ describe('DadosIniciativa: RN-02 (datas e horário)', () => {
   });
 });
 
+/**
+ * Caracterização do comportamento atual de `criar` e `comDatas`, escrita antes da refatoração
+ * DT-02 (docs/qualidade/divida-tecnica.md): mensagens exatas, ordem dos erros acumulados e as
+ * combinações de datas e horas que dependem da ordem das verificações.
+ */
+describe('DadosIniciativa: comportamento preservado na refatoração (DT-02)', () => {
+  it.each([
+    ['titulo', LIMITES.titulo, `O título deve ter no máximo ${LIMITES.titulo} caracteres.`],
+    [
+      'resumo',
+      LIMITES.resumo,
+      `A descrição resumida deve ter no máximo ${LIMITES.resumo} caracteres.`,
+    ],
+    [
+      'detalhe',
+      LIMITES.detalhe,
+      `A descrição detalhada deve ter no máximo ${LIMITES.detalhe} caracteres.`,
+    ],
+    ['espaco', LIMITES.espaco, `O espaço deve ter no máximo ${LIMITES.espaco} caracteres.`],
+    [
+      'organizadores',
+      LIMITES.organizadores,
+      `Os organizadores devem ter no máximo ${LIMITES.organizadores} caracteres.`,
+    ],
+    ['membros', LIMITES.membros, `Os membros devem ter no máximo ${LIMITES.membros} caracteres.`],
+  ] as const)('%s acima do limite gera a mensagem exata', (campo, limite, mensagem) => {
+    expect(errosDe(dadosValidos({ [campo]: 'a'.repeat(limite + 1) }))).toEqual({
+      [campo]: mensagem,
+    });
+  });
+
+  it('participantes acima do limite gera a mensagem exata', () => {
+    expect(errosDe(dadosValidos({ participantes: LIMITES.participantesMax + 1 }))).toEqual({
+      participantes: `O número de participantes deve ser no máximo ${LIMITES.participantesMax}.`,
+    });
+  });
+
+  it('os erros acumulados saem na ordem dos campos do formulário', () => {
+    expect(Object.keys(errosDe({}))).toEqual([
+      'tipo',
+      'titulo',
+      'resumo',
+      'detalhe',
+      'inicio',
+      'fim',
+      'periodicidade',
+      'espaco',
+      'organizadores',
+      'participantes',
+    ]);
+    expect(
+      Object.keys(
+        errosDe(
+          dadosValidos({
+            tipo: 'x',
+            horaInicio: '25:00',
+            horaFim: '26:00',
+            membros: 'a'.repeat(LIMITES.membros + 1),
+          }),
+        ),
+      ),
+    ).toEqual(['tipo', 'horaInicio', 'horaFim', 'membros']);
+  });
+
+  it('término antes de um início inválido: só o início é apontado', () => {
+    expect(errosDe(dadosValidos({ inicio: '2026-02-30', fim: '2026-01-01' }))).toEqual({
+      inicio: 'Informe uma data de início válida.',
+    });
+  });
+
+  it('hora de início inválida não é comparada com a de término', () => {
+    expect(errosDe(dadosValidos({ horaInicio: '9h', horaFim: '08:00' }))).toEqual({
+      horaInicio: 'Informe uma hora de início válida.',
+    });
+  });
+
+  it('hora de término inválida gera só a mensagem de formato', () => {
+    expect(errosDe(dadosValidos({ horaInicio: '09:00', horaFim: '8h' }))).toEqual({
+      horaFim: 'Informe uma hora de término válida.',
+    });
+  });
+
+  it('apara todos os textos e guarda os valores na ordem recebida', () => {
+    const dados = DadosIniciativa.criar(
+      dadosValidos({
+        tipo: ' EVENTO ',
+        resumo: ' r ',
+        detalhe: ' d ',
+        espaco: ' e ',
+        organizadores: ' o ',
+        membros: ' m ',
+        periodicidade: ' SEMANAL ',
+        inicio: ' 2026-12-10 ',
+        fim: ' 2026-12-11 ',
+        horaInicio: ' 09:00 ',
+        horaFim: ' 10:00 ',
+        participantes: '12',
+      }),
+      TIPOS_ATIVOS,
+    );
+    expect({ ...dados }).toEqual({
+      tipo: 'EVENTO',
+      titulo: dadosValidos().titulo,
+      resumo: 'r',
+      detalhe: 'd',
+      inicio: '2026-12-10',
+      fim: '2026-12-11',
+      horaInicio: '09:00',
+      horaFim: '10:00',
+      periodicidade: 'SEMANAL',
+      espaco: 'e',
+      organizadores: 'o',
+      membros: 'm',
+      participantes: 12,
+    });
+    expect(Object.keys(dados)).toEqual([
+      'tipo',
+      'titulo',
+      'resumo',
+      'detalhe',
+      'inicio',
+      'fim',
+      'horaInicio',
+      'horaFim',
+      'periodicidade',
+      'espaco',
+      'organizadores',
+      'membros',
+      'participantes',
+    ]);
+  });
+
+  it('sem a lista de tipos permitidos, confere só o formato do código', () => {
+    expect(DadosIniciativa.criar(dadosValidos({ tipo: 'QUALQUER_TIPO' })).tipo).toBe(
+      'QUALQUER_TIPO',
+    );
+  });
+
+  it('comDatas troca só datas e horários e mantém os outros campos', () => {
+    const antes = DadosIniciativa.criar(dadosValidos({ membros: 'Ana' }));
+    const depois = antes.comDatas({ inicio: '2027-01-05', fim: '2027-01-06', horaInicio: null });
+    expect({ ...depois }).toEqual({
+      ...antes,
+      inicio: '2027-01-05',
+      fim: '2027-01-06',
+      horaInicio: null,
+      horaFim: null,
+    });
+  });
+
+  it('comDatas revalida: só os erros de data e hora aparecem', () => {
+    const dados = DadosIniciativa.criar(dadosValidos());
+    expect(() =>
+      dados.comDatas({ inicio: '2027-01-06', fim: '2027-01-05', horaInicio: '10:00' }),
+    ).toThrow(ValidacaoError);
+    try {
+      dados.comDatas({ inicio: '2027-01-06', fim: '2027-01-05', horaInicio: '10:00' });
+    } catch (error) {
+      expect((error as ValidacaoError).campos).toEqual({
+        fim: 'A data de término deve ser igual ou posterior à de início.',
+        horaFim: 'Informe a hora de término ou apague a de início.',
+      });
+    }
+  });
+});
+
 describe('DadosIniciativa: tipos do cadastro', () => {
   it('aceita qualquer tipo ativo cadastrado, como PALESTRA', () => {
     const dados = DadosIniciativa.criar(dadosValidos({ tipo: 'PALESTRA' }), new Set(['PALESTRA']));
