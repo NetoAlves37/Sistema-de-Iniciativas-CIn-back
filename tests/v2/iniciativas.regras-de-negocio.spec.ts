@@ -1,8 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { PRAZOS_PADRAO, umaIniciativa } from '@/modules/iniciativas/testing/builders/iniciativa.builder';
-import { DIA, entrada, montar, T0 } from '@/modules/iniciativas/testing/montar-casos-de-uso';
-import { ValidacaoError } from '@/shared/domain/domain-error';
-import { FakeClock } from '@/shared/testing/fake-clock';
 import {
   AutorNaoPodeDecidirError,
   SomenteAutorError,
@@ -10,6 +6,13 @@ import {
 } from '@/modules/iniciativas/domain/errors/iniciativas.errors';
 import { Iniciativa } from '@/modules/iniciativas/domain/iniciativa';
 import { DadosIniciativa } from '@/modules/iniciativas/domain/value-objects/dados-iniciativa';
+import {
+  PRAZOS_PADRAO,
+  umaIniciativa,
+} from '@/modules/iniciativas/testing/builders/iniciativa.builder';
+import { DIA, entrada, montar, T0 } from '@/modules/iniciativas/testing/montar-casos-de-uso';
+import { ValidacaoError } from '@/shared/domain/domain-error';
+import { FakeClock } from '@/shared/testing/fake-clock';
 
 /* ===========================================================================
  * HELPERS
@@ -19,6 +22,12 @@ import { DadosIniciativa } from '@/modules/iniciativas/domain/value-objects/dado
  * aparecem nos testes originais. Ajuste se o DTO usar outro nome.
  * ========================================================================= */
 const txt = (n: number) => 'a'.repeat(n);
+
+/**
+ * Tipos de iniciativa viraram cadastro (ADR-024): o caso de uso informa ao domínio quais
+ * códigos estão ativos, e só eles são aceitos. Aqui, os três tipos usados pela suíte.
+ */
+const TIPOS_ATIVOS = new Set(['EXTENSAO', 'PESQUISA', 'EVENTO']);
 
 const criar = (clock: FakeClock, comVotacao = true, autor = 'ana') =>
   Iniciativa.submeter(DadosIniciativa.criar(entrada()), autor, comVotacao, clock, PRAZOS_PADRAO);
@@ -58,25 +67,28 @@ describe('US01 - Submissão de Iniciativa', () => {
     expect(repositorio.persistida(id)).toMatchObject({ status: 'EM_ANDAMENTO', ciclo: 1 });
   });
 
-  it.each(['EXTENSAO', 'PESQUISA', 'EVENTO'])(
-    'US01 tipo válido %s | Partição de Equivalência (classe válida) | aceito',
-    (tipo) => {
-      // Requisito: US01 - tipo permitido
-      // Técnica: Partição de Equivalência (cada valor do domínio)
-      // Esperado: DadosIniciativa.criar aceita e devolve o mesmo tipo informado
-      expect(DadosIniciativa.criar(entrada({ tipo })).tipo).toBe(tipo);
-    },
-  );
+  it.each([
+    'EXTENSAO',
+    'PESQUISA',
+    'EVENTO',
+  ])('US01 tipo válido %s | Partição de Equivalência (classe válida) | aceito', (tipo) => {
+    // Requisito: US01 - tipo permitido (um tipo ativo do cadastro)
+    // Técnica: Partição de Equivalência (cada valor do domínio)
+    // Esperado: DadosIniciativa.criar aceita e devolve o mesmo tipo informado
+    expect(DadosIniciativa.criar(entrada({ tipo }), TIPOS_ATIVOS).tipo).toBe(tipo);
+  });
 
-  it.each(['OUTRO', '', 'extensao'])(
-    'US01 tipo inválido "%s" | Partição de Equivalência (classe inválida) | ValidacaoError',
-    (tipo) => {
-      // Requisito: US01 - tipo diferente de EXTENSAO/PESQUISA/EVENTO
-      // Técnica: Partição de Equivalência (classe inválida)
-      // Esperado: ValidacaoError
-      expect(() => DadosIniciativa.criar(entrada({ tipo }))).toThrow(ValidacaoError);
-    },
-  );
+  it.each([
+    'OUTRO',
+    '',
+    'extensao',
+  ])('US01 tipo inválido "%s" | Partição de Equivalência (classe inválida) | ValidacaoError', (tipo) => {
+    // Requisito: US01 - tipo fora do cadastro de tipos ativos (antes: diferente de
+    // EXTENSAO/PESQUISA/EVENTO; desde o ADR-024 os tipos são um cadastro)
+    // Técnica: Partição de Equivalência (classe inválida)
+    // Esperado: ValidacaoError
+    expect(() => DadosIniciativa.criar(entrada({ tipo }), TIPOS_ATIVOS)).toThrow(ValidacaoError);
+  });
 
   it.each([
     ['titulo', 120, 'válido'],
@@ -112,15 +124,17 @@ describe('US01 - Submissão de Iniciativa', () => {
     expect(() => DadosIniciativa.criar(entrada({ titulo: '   ' }))).toThrow(ValidacaoError);
   });
 
-  it.each(['31/12/2030', 'abc', '2030-13-40', ''])(
-    'US01 data de início com formato inválido "%s" | Partição de Equivalência (classe inválida) | ValidacaoError',
-    (inicio) => {
-      // Requisito: US01 - datas em formato inválido
-      // Técnica: Partição de Equivalência
-      // Esperado: ValidacaoError
-      expect(() => DadosIniciativa.criar(entrada({ inicio }))).toThrow(ValidacaoError);
-    },
-  );
+  it.each([
+    '31/12/2030',
+    'abc',
+    '2030-13-40',
+    '',
+  ])('US01 data de início com formato inválido "%s" | Partição de Equivalência (classe inválida) | ValidacaoError', (inicio) => {
+    // Requisito: US01 - datas em formato inválido
+    // Técnica: Partição de Equivalência
+    // Esperado: ValidacaoError
+    expect(() => DadosIniciativa.criar(entrada({ inicio }))).toThrow(ValidacaoError);
+  });
 
   it('US01 término 1 dia antes do início | Valor-Limite (mínimo inválido) | ValidacaoError', () => {
     // Requisito: US01 - data de término anterior à de início
@@ -167,23 +181,25 @@ describe('US01 - Submissão de Iniciativa', () => {
     else expect(acao).toThrow(ValidacaoError);
   });
 
-  it.each(['25:00', '10:60', 'dez', ''])(
-    'US01 horário com formato inválido "%s" | Partição de Equivalência (classe inválida) | ValidacaoError',
-    (horaInicio) => {
-      // Requisito: US01 - horário em formato inválido
-      // Técnica: Partição de Equivalência
-      // Esperado: ValidacaoError
-      expect(() => DadosIniciativa.criar(entrada({ horaInicio }))).toThrow(ValidacaoError);
-    },
-  );
+  it.each([
+    '25:00',
+    '10:60',
+    'dez',
+    '',
+  ])('US01 horário com formato inválido "%s" | Partição de Equivalência (classe inválida) | ValidacaoError', (horaInicio) => {
+    // Requisito: US01 - horário em formato inválido
+    // Técnica: Partição de Equivalência
+    // Esperado: ValidacaoError
+    expect(() => DadosIniciativa.criar(entrada({ horaInicio }))).toThrow(ValidacaoError);
+  });
 
   it('US01 periodicidade fora do permitido | Partição de Equivalência (classe inválida) | ValidacaoError', () => {
     // Requisito: US01 - periodicidade fora do conjunto permitido
     // Técnica: Partição de Equivalência
     // Esperado: ValidacaoError
-    expect(() => DadosIniciativa.criar(entrada({ periodicidade: 'QUINZENAL_INEXISTENTE' }))).toThrow(
-      ValidacaoError,
-    );
+    expect(() =>
+      DadosIniciativa.criar(entrada({ periodicidade: 'QUINZENAL_INEXISTENTE' })),
+    ).toThrow(ValidacaoError);
   });
 
   it('US01 organizadores vazio | Partição de Equivalência (classe inválida) | ValidacaoError', () => {
@@ -253,24 +269,26 @@ describe('US02 - Avaliação de Iniciativa', () => {
   // teste, não defeito do sistema). Foram refeitos pelo caminho certo em us02-registrar-decisao.spec.ts
   // (lacuna L13). A versão original continua preservada em tests/v1-llm/.
 
-  it.each(['EM_ANDAMENTO', 'EM_VOTACAO', 'APROVADA', 'REPROVADA'])(
-    'US02 avaliar iniciativa em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError',
-    (status) => {
-      // Requisito: US02 - apenas EM_ANALISE pode ser avaliada
-      // Técnica: Partição de Equivalência (cada status diferente de EM_ANALISE)
-      // Esperado: TransicaoInvalidaError
-      const clock = new FakeClock(T0);
-      const mapa: Record<string, () => Iniciativa> = {
-        EM_ANDAMENTO: () => criar(clock),
-        EM_VOTACAO: () => emVotacao(clock),
-        APROVADA: () => aprovada(clock),
-        REPROVADA: () => reprovada(clock),
-      };
-      expect(() => mapa[status]().decidir('APROVADA', undefined, 'carla', clock)).toThrow(
-        TransicaoInvalidaError,
-      );
-    },
-  );
+  it.each([
+    'EM_ANDAMENTO',
+    'EM_VOTACAO',
+    'APROVADA',
+    'REPROVADA',
+  ])('US02 avaliar iniciativa em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError', (status) => {
+    // Requisito: US02 - apenas EM_ANALISE pode ser avaliada
+    // Técnica: Partição de Equivalência (cada status diferente de EM_ANALISE)
+    // Esperado: TransicaoInvalidaError
+    const clock = new FakeClock(T0);
+    const mapa: Record<string, () => Iniciativa> = {
+      EM_ANDAMENTO: () => criar(clock),
+      EM_VOTACAO: () => emVotacao(clock),
+      APROVADA: () => aprovada(clock),
+      REPROVADA: () => reprovada(clock),
+    };
+    expect(() => mapa[status]().decidir('APROVADA', undefined, 'carla', clock)).toThrow(
+      TransicaoInvalidaError,
+    );
+  });
 
   it('US02 autor avalia a própria iniciativa | Partição de Equivalência (autor) | AutorNaoPodeDecidirError', async () => {
     // Requisito: US02 - autor não avalia a própria iniciativa
@@ -336,24 +354,26 @@ describe('US05 - Edição e Ressubmissão', () => {
     );
   });
 
-  it.each(['EM_VOTACAO', 'EM_ANALISE', 'APROVADA', 'REPROVADA'])(
-    'US05 edição em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError',
-    (status) => {
-      // Requisito: US05 - edição só em EM_ANDAMENTO
-      // Técnica: Partição de Equivalência (cada status != EM_ANDAMENTO)
-      // Esperado: TransicaoInvalidaError
-      const clock = new FakeClock(T0);
-      const mapa: Record<string, () => Iniciativa> = {
-        EM_VOTACAO: () => emVotacao(clock),
-        EM_ANALISE: () => emAnalise(clock),
-        APROVADA: () => aprovada(clock),
-        REPROVADA: () => reprovada(clock),
-      };
-      expect(() =>
-        mapa[status]().editar(DadosIniciativa.criar(entrada()), true, 'ana', clock),
-      ).toThrow(TransicaoInvalidaError);
-    },
-  );
+  it.each([
+    'EM_VOTACAO',
+    'EM_ANALISE',
+    'APROVADA',
+    'REPROVADA',
+  ])('US05 edição em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError', (status) => {
+    // Requisito: US05 - edição só em EM_ANDAMENTO
+    // Técnica: Partição de Equivalência (cada status != EM_ANDAMENTO)
+    // Esperado: TransicaoInvalidaError
+    const clock = new FakeClock(T0);
+    const mapa: Record<string, () => Iniciativa> = {
+      EM_VOTACAO: () => emVotacao(clock),
+      EM_ANALISE: () => emAnalise(clock),
+      APROVADA: () => aprovada(clock),
+      REPROVADA: () => reprovada(clock),
+    };
+    expect(() =>
+      mapa[status]().editar(DadosIniciativa.criar(entrada()), true, 'ana', clock),
+    ).toThrow(TransicaoInvalidaError);
+  });
 
   it('US05 ressubmissão pelo autor em REPROVADA | Partição de Equivalência | ciclo +1 e EM_ANDAMENTO', () => {
     // Requisito: US05 - ressubmissão incrementa ciclo e volta a EM_ANDAMENTO
@@ -378,24 +398,32 @@ describe('US05 - Edição e Ressubmissão', () => {
     ).toThrow(SomenteAutorError);
   });
 
-  it.each(['EM_ANDAMENTO', 'EM_VOTACAO', 'EM_ANALISE', 'APROVADA'])(
-    'US05 ressubmissão em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError',
-    (status) => {
-      // Requisito: US05 - ressubmissão só em REPROVADA
-      // Técnica: Partição de Equivalência (cada status != REPROVADA)
-      // Esperado: TransicaoInvalidaError
-      const clock = new FakeClock(T0);
-      const mapa: Record<string, () => Iniciativa> = {
-        EM_ANDAMENTO: () => criar(clock),
-        EM_VOTACAO: () => emVotacao(clock),
-        EM_ANALISE: () => emAnalise(clock),
-        APROVADA: () => aprovada(clock),
-      };
-      expect(() =>
-        mapa[status]().ressubmeter(DadosIniciativa.criar(entrada()), true, 'ana', clock, PRAZOS_PADRAO),
-      ).toThrow(TransicaoInvalidaError);
-    },
-  );
+  it.each([
+    'EM_ANDAMENTO',
+    'EM_VOTACAO',
+    'EM_ANALISE',
+    'APROVADA',
+  ])('US05 ressubmissão em %s | Partição de Equivalência (status inválido) | TransicaoInvalidaError', (status) => {
+    // Requisito: US05 - ressubmissão só em REPROVADA
+    // Técnica: Partição de Equivalência (cada status != REPROVADA)
+    // Esperado: TransicaoInvalidaError
+    const clock = new FakeClock(T0);
+    const mapa: Record<string, () => Iniciativa> = {
+      EM_ANDAMENTO: () => criar(clock),
+      EM_VOTACAO: () => emVotacao(clock),
+      EM_ANALISE: () => emAnalise(clock),
+      APROVADA: () => aprovada(clock),
+    };
+    expect(() =>
+      mapa[status]().ressubmeter(
+        DadosIniciativa.criar(entrada()),
+        true,
+        'ana',
+        clock,
+        PRAZOS_PADRAO,
+      ),
+    ).toThrow(TransicaoInvalidaError);
+  });
 
   it('US05 ressubmissão com dados idênticos | Partição de Equivalência (caso limite de dados) | aceita', () => {
     // Requisito: US05 - é permitido ressubmeter com dados idênticos
@@ -453,20 +481,22 @@ describe('US06 - Comentários (permissão por status e prazo de refinamento)', (
     expect(i.permissoesPara(usuario('bruno'), clock).podeComentar).toBe(false);
   });
 
-  it.each(['EM_VOTACAO', 'EM_ANALISE', 'APROVADA', 'REPROVADA'])(
-    'US06 status %s | Partição de Equivalência (status inválido) | não pode comentar',
-    (status) => {
-      // Requisito: US06 - comentário só em EM_ANDAMENTO
-      // Técnica: Partição de Equivalência (cada status != EM_ANDAMENTO)
-      // Esperado: podeComentar false
-      const clock = new FakeClock(T0);
-      const mapa: Record<string, () => Iniciativa> = {
-        EM_VOTACAO: () => emVotacao(clock),
-        EM_ANALISE: () => emAnalise(clock),
-        APROVADA: () => aprovada(clock),
-        REPROVADA: () => reprovada(clock),
-      };
-      expect(mapa[status]().permissoesPara(usuario('bruno'), clock).podeComentar).toBe(false);
-    },
-  );
+  it.each([
+    'EM_VOTACAO',
+    'EM_ANALISE',
+    'APROVADA',
+    'REPROVADA',
+  ])('US06 status %s | Partição de Equivalência (status inválido) | não pode comentar', (status) => {
+    // Requisito: US06 - comentário só em EM_ANDAMENTO
+    // Técnica: Partição de Equivalência (cada status != EM_ANDAMENTO)
+    // Esperado: podeComentar false
+    const clock = new FakeClock(T0);
+    const mapa: Record<string, () => Iniciativa> = {
+      EM_VOTACAO: () => emVotacao(clock),
+      EM_ANALISE: () => emAnalise(clock),
+      APROVADA: () => aprovada(clock),
+      REPROVADA: () => reprovada(clock),
+    };
+    expect(mapa[status]().permissoesPara(usuario('bruno'), clock).podeComentar).toBe(false);
+  });
 });
