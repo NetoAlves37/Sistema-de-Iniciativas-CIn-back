@@ -41,7 +41,7 @@
 | US05 - Impedir edição por usuário diferente do autor                    | Autor                       | Autor ≠ usuário autenticado                                                    | Tentar editar iniciativa → erro de autorização                                       | sim                  | sim                  |
 | US05 - Impedir edição fora do refinamento                               | Status                      | Status diferente de EM_ANDAMENTO                                               | Tentar editar iniciativa → erro de transição inválida                                | sim                  | sim                  |
 | US05 - Ressubmeter iniciativa reprovada com alterações                  | Dados e status              | Status REPROVADA e dados válidos                                               | Ressubmeter iniciativa → dados atualizados e status EM_ANDAMENTO                     | sim                  | sim                  |
-| US05 - Ressubmeter iniciativa sem alterações                            | Dados da iniciativa         | Dados iguais aos anteriores                                                    | Ressubmeter iniciativa → operação aceita conforme regra atual do backend             | sim                  | sim                  |
+| US05 - Ressubmeter iniciativa sem alterações                            | Dados da iniciativa         | Dados iguais aos anteriores                                                    | Ressubmeter iniciativa → aceita (decisão da dona do produto em 15/11/2026: a HU-06 não exige alteração, ver nota 1) | sim                  | sim                  |
 | US05 - Impedir ressubmissão por usuário diferente do autor              | Autor                       | Autor ≠ usuário autenticado                                                    | Tentar ressubmeter iniciativa → erro de autorização                                  | sim                  | sim                  |
 | US05 - Impedir ressubmissão de iniciativa não reprovada                 | Status                      | Status diferente de REPROVADA                                                  | Tentar ressubmeter iniciativa → erro de transição inválida                           | sim                  | sim                  |
 | US05 - Ressubmeter iniciativa e incrementar ciclo                       | Ciclo                       | Ciclo anterior + 1                                                             | Ressubmeter iniciativa → ciclo incrementado e refinamento reaberto                   | sim                  | sim                  |
@@ -54,3 +54,12 @@
 | US06 - Comentar com texto acima do limite                               | Texto do comentário         | 0 (inválido), 1(válido), 1000(válido), 1001 (inválido) caracteres              | Comentar iniciativa → erro de validação                                              | não                  | sim                  |
 | US06 - Comentar em iniciativa válida                                    | Texto do comentário         | 0 (inválido), 1(válido), 1000(válido), 1001 (inválido) caracteres              | Comentar iniciativa → comentário salvo e retornado                                   | não                  | sim                  |
 | US06 - Comentar em iniciativa inexistente                               | Identificador da iniciativa | ID não existente                                                               | Comentar iniciativa → erro (iniciativa não encontrada)                               | não                  | sim                  |
+
+**Nota 1 (ressubmeter sem alterações).** A HU-06 (SCRUM-49) e a RN-11 não dizem se a
+ressubmissão precisa trazer alguma alteração. A versão de 10/11 desta matriz esperava "recusa";
+a de 12/11 passou a esperar "aceita conforme regra atual do backend", ou seja, o oráculo foi
+tirado do código, e a mesma frase entrou no prompt da v1. Em 15/11/2026 a dona do produto
+decidiu que ressubmeter com os mesmos dados **é permitido**: a aprovação depende do comitê, e
+uma ideia reprovada num ciclo pode ser aprovada em outro sem mudar nada; a ressubmissão continua
+restrita ao autor e ao status Reprovada, então não há risco de segurança. O oráculo "aceita"
+passa a ter origem no requisito, e o caso não é um defeito.
