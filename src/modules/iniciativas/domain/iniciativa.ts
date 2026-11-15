@@ -3,9 +3,11 @@ import type { DomainEvent } from '@/shared/domain/domain-event';
 import {
   AutorNaoPodeDecidirError,
   SomenteAutorError,
+  SomenteComiteError,
   TransicaoInvalidaError,
 } from './errors/iniciativas.errors';
 import {
+  DatasIniciativaAlteradas,
   IniciativaDecidida,
   IniciativaEditada,
   IniciativaRessubmetida,
@@ -15,7 +17,7 @@ import {
 } from './events/iniciativa.events';
 import { MS_POR_DIA, type PrazosConfig } from './ports/prazos-config';
 import type { StatusIniciativa } from './status';
-import type { DadosIniciativa } from './value-objects/dados-iniciativa';
+import type { DadosIniciativa, DatasIniciativaBrutas } from './value-objects/dados-iniciativa';
 
 /** Autor das transições feitas pelo job e pelos prazos. */
 export const AUTOR_SISTEMA = 'SISTEMA';
@@ -28,7 +30,23 @@ export const NOTAS = {
   aprovada: 'Aprovada pelo comitê',
   reprovada: 'Reprovada pelo comitê',
   ressubmetida: (ciclo: number) => `Ressubmetida após reprovação (ciclo ${ciclo})`,
+  datasAlteradas: (antes: DadosIniciativa, depois: DadosIniciativa) =>
+    `Datas alteradas: de ${descreverPeriodo(antes)} para ${descreverPeriodo(depois)}`,
 } as const;
+
+/** `YYYY-MM-DD` → `DD/MM/YYYY`. */
+const dataBr = (dia: string) => dia.split('-').reverse().join('/');
+
+/** Ex.: `10/12/2026 a 11/12/2026, 09:00–18:00` ou `10/12/2026 (dia inteiro)`. */
+function descreverPeriodo(dados: DadosIniciativa): string {
+  const datas =
+    dados.inicio === dados.fim
+      ? dataBr(dados.inicio)
+      : `${dataBr(dados.inicio)} a ${dataBr(dados.fim)}`;
+  return dados.horaInicio
+    ? `${datas}, ${dados.horaInicio}–${dados.horaFim}`
+    : `${datas} (dia inteiro)`;
+}
 
 /** Uma entrada do histórico de status. */
 export interface Transicao {
@@ -344,6 +362,30 @@ export class Iniciativa {
     };
     this.registrar('REPROVADA', 'EM_ANDAMENTO', porUsuarioId, NOTAS.ressubmetida(ciclo), agora);
     this.eventos.push(new IniciativaRessubmetida(this.props.id, ciclo, agora));
+  }
+
+  /**
+   * Muda datas e horários de uma aprovada (a série inteira das ocorrências). Só o comitê ou o
+   * ADMIN (403) e só em `APROVADA` (409). O autor que é do comitê também pode: não é uma
+   * decisão, então não há conflito de interesse. Registra no histórico o antes e o depois.
+   */
+  alterarDatas(
+    datas: DatasIniciativaBrutas,
+    ator: { id: string; ehComite: boolean },
+    clock: Clock,
+  ): void {
+    if (!ator.ehComite) throw new SomenteComiteError();
+    if (this.props.status !== 'APROVADA') {
+      throw new TransicaoInvalidaError(this.props.status, 'alterarDatas');
+    }
+    const antes = this.props.dados;
+    const depois = antes.comDatas(datas);
+    const agora = clock.now();
+    this.props = { ...this.props, dados: depois };
+    this.registrar('APROVADA', 'APROVADA', ator.id, NOTAS.datasAlteradas(antes, depois), agora);
+    this.eventos.push(
+      new DatasIniciativaAlteradas(this.props.id, this.props.ciclo, agora, ator.id),
+    );
   }
 
   /** O que o usuário pode fazer agora. Calculado no domínio: o front não recalcula regras. */

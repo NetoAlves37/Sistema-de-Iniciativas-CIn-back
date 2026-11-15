@@ -22,6 +22,26 @@ export interface TestApp {
   close(): Promise<void>;
 }
 
+/**
+ * Os tipos de iniciativa são um cadastro e um banco novo começa vazio. Os testes submetem
+ * com `EXTENSAO`, `PESQUISA` e `EVENTO`, então eles são garantidos (e reativados) aqui.
+ */
+export const TIPOS_DE_TESTE = [
+  { code: 'EXTENSAO', label: 'Extensão', cor: '#9BE0A0' },
+  { code: 'PESQUISA', label: 'Pesquisa', cor: '#A7C7F2' },
+  { code: 'EVENTO', label: 'Evento', cor: '#F7AE85' },
+] as const;
+
+async function garantirTiposDeTeste(prisma: PrismaService): Promise<void> {
+  for (const tipo of TIPOS_DE_TESTE) {
+    await prisma.tipoIniciativa.upsert({
+      where: { code: tipo.code },
+      update: { label: tipo.label, cor: tipo.cor, ativo: true },
+      create: tipo,
+    });
+  }
+}
+
 export interface AuthedRequest {
   get(path: string): supertest.Test;
   post(path: string): supertest.Test;
@@ -62,5 +82,8 @@ export async function createTestApp(inicio?: Date): Promise<TestApp> {
     };
   };
 
-  return { app, clock, prisma: app.get(PrismaService), api, req, http, close: () => app.close() };
+  const prisma = app.get(PrismaService);
+  await garantirTiposDeTeste(prisma);
+
+  return { app, clock, prisma, api, req, http, close: () => app.close() };
 }

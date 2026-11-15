@@ -3,6 +3,7 @@ import type {
   AprovadaParaCalendarioDto,
   AtorDto,
   DadosIniciativaInput,
+  DatasIniciativaInput,
   DetalheIniciativaDto,
   EstadoIniciativaDto,
   FiltroListagemDto,
@@ -12,6 +13,7 @@ import type {
   TransicaoDto,
 } from './dto/iniciativa.dto';
 import type { ConsultasIniciativas } from './queries/consultas-iniciativas';
+import type { AlterarDatasIniciativa } from './use-cases/alterar-datas-iniciativa';
 import type { AplicarPrazosVencidos } from './use-cases/aplicar-prazos-vencidos';
 import type { CarregarComPrazos } from './use-cases/carregar-com-prazos';
 import type { DecidirIniciativa } from './use-cases/decidir-iniciativa';
@@ -53,6 +55,7 @@ export class IniciativasFacade {
     private readonly consultas: ConsultasIniciativas,
     private readonly carregar: CarregarComPrazos,
     private readonly job: AplicarPrazosVencidos,
+    private readonly alterarDatasIniciativa: AlterarDatasIniciativa,
   ) {}
 
   // --- contrato usado pelos outros módulos --------------------------------------------------
@@ -116,6 +119,11 @@ export class IniciativasFacade {
 
   ressubmeter(id: string, usuarioId: string, entrada: DadosIniciativaInput): Promise<void> {
     return this.ressubmeterIniciativa.executar(id, usuarioId, entrada);
+  }
+
+  /** Comitê ou ADMIN muda datas e horários de uma aprovada (a série inteira). */
+  alterarDatas(id: string, ator: AtorDto, datas: DatasIniciativaInput): Promise<void> {
+    return this.alterarDatasIniciativa.executar(id, ator, datas);
   }
 
   minhas(autorId: string, filtro: { status?: StatusIniciativa; page: number; limit: number }) {

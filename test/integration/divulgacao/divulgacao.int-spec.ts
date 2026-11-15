@@ -155,8 +155,8 @@ describe('Divulgação (HTTP)', () => {
       expect(fachada.listagens[0].tipo).toBeUndefined();
     });
 
-    it('tipo inválido recebe 422', async () => {
-      const resposta = await http.get(`${api}/aprovadas?tipo=OUTRO`).set(await comoAna());
+    it('código de tipo fora do formato recebe 422', async () => {
+      const resposta = await http.get(`${api}/aprovadas?tipo=outro-tipo`).set(await comoAna());
       expect(resposta.status).toBe(422);
     });
   });
@@ -248,9 +248,9 @@ describe('Divulgação (HTTP)', () => {
       expect(fachada.calendarios[0].tipos).toEqual(['EVENTO', 'PESQUISA']);
     });
 
-    it('`tipos` com valor desconhecido recebe 422', async () => {
+    it('`tipos` com código fora do formato recebe 422', async () => {
       const resposta = await http
-        .get(`${api}/ocorrencias?de=2026-11-01&ate=2026-12-01&tipos=EVENTO,XYZ`)
+        .get(`${api}/ocorrencias?de=2026-11-01&ate=2026-12-01&tipos=EVENTO,x-y`)
         .set(await comoAna());
       expect(resposta.status).toBe(422);
     });

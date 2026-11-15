@@ -26,9 +26,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -43,9 +41,7 @@
                       "example": {},
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -64,9 +60,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -100,9 +94,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -122,9 +114,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -147,9 +137,7 @@
                       },
                       "additionalProperties": {
                         "type": "object",
-                        "required": [
-                          "status"
-                        ],
+                        "required": ["status"],
                         "properties": {
                           "status": {
                             "type": "string"
@@ -165,9 +153,7 @@
           }
         },
         "summary": "Verifica o status da aplicação e conexão com banco",
-        "tags": [
-          "Health"
-        ]
+        "tags": ["Health"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/me": {
@@ -192,9 +178,7 @@
           }
         ],
         "summary": "Retorna o usuário autenticado, o perfil e os prazos configurados",
-        "tags": [
-          "Identidade"
-        ]
+        "tags": ["Identidade"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas": {
@@ -225,9 +209,7 @@
           }
         ],
         "summary": "Submeter uma iniciativa (abre o refinamento)",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       },
       "get": {
         "description": "Ex.: `status=EM_VOTACAO&ordenar=relevancia` (início) e `status=EM_ANDAMENTO&ordenar=prazo`.",
@@ -264,13 +246,7 @@
             "description": "Filtro por status",
             "schema": {
               "type": "string",
-              "enum": [
-                "EM_ANDAMENTO",
-                "EM_VOTACAO",
-                "EM_ANALISE",
-                "APROVADA",
-                "REPROVADA"
-              ]
+              "enum": ["EM_ANDAMENTO", "EM_VOTACAO", "EM_ANALISE", "APROVADA", "REPROVADA"]
             }
           },
           {
@@ -280,11 +256,7 @@
             "description": "Filtro por tipo",
             "schema": {
               "type": "string",
-              "enum": [
-                "EXTENSAO",
-                "PESQUISA",
-                "EVENTO"
-              ]
+              "enum": ["EXTENSAO", "PESQUISA", "EVENTO"]
             }
           },
           {
@@ -303,12 +275,7 @@
             "description": "Ordenação (padrão: recentes)",
             "schema": {
               "type": "string",
-              "enum": [
-                "relevancia",
-                "prazo",
-                "recentes",
-                "inicio"
-              ]
+              "enum": ["relevancia", "prazo", "recentes", "inicio"]
             }
           }
         ],
@@ -323,9 +290,7 @@
           }
         ],
         "summary": "Listar iniciativas (filtros, ordenação e paginação no servidor)",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/minhas": {
@@ -363,13 +328,7 @@
             "description": "Filtro por status",
             "schema": {
               "type": "string",
-              "enum": [
-                "EM_ANDAMENTO",
-                "EM_VOTACAO",
-                "EM_ANALISE",
-                "APROVADA",
-                "REPROVADA"
-              ]
+              "enum": ["EM_ANDAMENTO", "EM_VOTACAO", "EM_ANALISE", "APROVADA", "REPROVADA"]
             }
           }
         ],
@@ -384,9 +343,7 @@
           }
         ],
         "summary": "Minhas iniciativas, com a contagem por status",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/contagens": {
@@ -404,9 +361,7 @@
           }
         ],
         "summary": "Contagens para o menu (iniciativas em análise)",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}": {
@@ -436,9 +391,7 @@
           }
         ],
         "summary": "Detalhe da iniciativa, com permissões calculadas para o usuário",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       },
       "patch": {
         "operationId": "IniciativasController_editar_v1",
@@ -482,9 +435,57 @@
           }
         ],
         "summary": "Editar a própria iniciativa (só em Em andamento)",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/datas": {
+      "patch": {
+        "description": "Muda início, término e horários da iniciativa; todas as ocorrências do calendário são recalculadas. A periodicidade não muda.",
+        "operationId": "IniciativasController_alterarDatas_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasIniciativaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Detalhe atualizado"
+          },
+          "403": {
+            "description": "Só o comitê ou o ADMIN"
+          },
+          "404": {
+            "description": "Iniciativa não encontrada"
+          },
+          "409": {
+            "description": "Só iniciativas aprovadas"
+          },
+          "422": {
+            "description": "Datas ou horários inválidos, com `errors` por campo"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Alterar datas e horários de uma aprovada (comitê ou ADMIN)",
+        "tags": ["Iniciativas"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/ressubmissao": {
@@ -530,9 +531,7 @@
           }
         ],
         "summary": "Ressubmeter uma iniciativa reprovada (novo ciclo)",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/historico": {
@@ -562,9 +561,7 @@
           }
         ],
         "summary": "Histórico de transições de status (mais recente primeiro)",
-        "tags": [
-          "Iniciativas"
-        ]
+        "tags": ["Iniciativas"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/comentarios": {
@@ -632,9 +629,7 @@
           }
         ],
         "summary": "Lista os comentários da iniciativa",
-        "tags": [
-          "Refinamento"
-        ]
+        "tags": ["Refinamento"]
       },
       "post": {
         "description": "Só enquanto a iniciativa está Em andamento. Qualquer usuário, inclusive o autor.",
@@ -689,9 +684,7 @@
           }
         ],
         "summary": "Comenta (sugere) na iniciativa",
-        "tags": [
-          "Refinamento"
-        ]
+        "tags": ["Refinamento"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/voto": {
@@ -748,9 +741,7 @@
           }
         ],
         "summary": "Registra, troca ou retira o voto do usuário",
-        "tags": [
-          "Votação"
-        ]
+        "tags": ["Votação"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/divulgacao/aprovadas": {
@@ -798,11 +789,7 @@
             "description": "EXTENSAO, PESQUISA ou EVENTO",
             "schema": {
               "type": "string",
-              "enum": [
-                "EXTENSAO",
-                "PESQUISA",
-                "EVENTO"
-              ]
+              "enum": ["EXTENSAO", "PESQUISA", "EVENTO"]
             }
           }
         ],
@@ -826,9 +813,7 @@
           }
         ],
         "summary": "Lista as iniciativas aprovadas",
-        "tags": [
-          "Divulgação"
-        ]
+        "tags": ["Divulgação"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/divulgacao/ocorrencias": {
@@ -871,10 +856,7 @@
             "schema": {
               "default": "false",
               "type": "string",
-              "enum": [
-                "true",
-                "false"
-              ]
+              "enum": ["true", "false"]
             }
           }
         ],
@@ -898,9 +880,7 @@
           }
         ],
         "summary": "Ocorrências das aprovadas no calendário",
-        "tags": [
-          "Divulgação"
-        ]
+        "tags": ["Divulgação"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/avaliacao/fila": {
@@ -953,9 +933,7 @@
           }
         ],
         "summary": "Fila de análise do comitê",
-        "tags": [
-          "Avaliação"
-        ]
+        "tags": ["Avaliação"]
       }
     },
     "/sistema-de-iniciativas-cin/api/v1/avaliacao/{id}/decisao": {
@@ -1008,9 +986,7 @@
           }
         ],
         "summary": "Registra a decisão do comitê (aprovar ou reprovar)",
-        "tags": [
-          "Avaliação"
-        ]
+        "tags": ["Avaliação"]
       }
     }
   },
@@ -1055,12 +1031,7 @@
           "perfil": {
             "description": "Perfil de exibição: ALUNO, PROFESSOR, COMITE ou ADMIN",
             "type": "string",
-            "enum": [
-              "ALUNO",
-              "PROFESSOR",
-              "COMITE",
-              "ADMIN"
-            ]
+            "enum": ["ALUNO", "PROFESSOR", "COMITE", "ADMIN"]
           },
           "ehComite": {
             "description": "Pode ver a fila de análise e decidir (membro do comitê ou administrador)",
@@ -1079,19 +1050,10 @@
                 "type": "number"
               }
             },
-            "required": [
-              "refinamentoDias",
-              "votacaoDias"
-            ]
+            "required": ["refinamentoDias", "votacaoDias"]
           }
         },
-        "required": [
-          "id",
-          "nome",
-          "perfil",
-          "ehComite",
-          "prazos"
-        ]
+        "required": ["id", "nome", "perfil", "ehComite", "prazos"]
       },
       "DadosIniciativaDto": {
         "type": "object",
@@ -1157,6 +1119,29 @@
           }
         }
       },
+      "DatasIniciativaDto": {
+        "type": "object",
+        "properties": {
+          "inicio": {
+            "description": "Data de início (YYYY-MM-DD)",
+            "type": "string"
+          },
+          "fim": {
+            "description": "Data de término (YYYY-MM-DD), igual ou posterior ao início",
+            "type": "string"
+          },
+          "horaInicio": {
+            "description": "Hora de início (HH:mm), junto com horaFim; null para dia inteiro",
+            "type": "string",
+            "nullable": true
+          },
+          "horaFim": {
+            "description": "Hora de término (HH:mm), posterior ao início; null para dia inteiro",
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
       "PaginaDeComentariosResponseDto": {
         "type": "object",
         "properties": {
@@ -1184,23 +1169,13 @@
                     },
                     "perfil": {
                       "type": "string",
-                      "enum": [
-                        "ALUNO",
-                        "PROFESSOR",
-                        "COMITE",
-                        "ADMIN"
-                      ]
+                      "enum": ["ALUNO", "PROFESSOR", "COMITE", "ADMIN"]
                     },
                     "ehAutorDaIniciativa": {
                       "type": "boolean"
                     }
                   },
-                  "required": [
-                    "id",
-                    "nome",
-                    "perfil",
-                    "ehAutorDaIniciativa"
-                  ]
+                  "required": ["id", "nome", "perfil", "ehAutorDaIniciativa"]
                 },
                 "texto": {
                   "type": "string"
@@ -1210,13 +1185,7 @@
                   "type": "string"
                 }
               },
-              "required": [
-                "id",
-                "ciclo",
-                "autor",
-                "texto",
-                "criadoEm"
-              ]
+              "required": ["id", "ciclo", "autor", "texto", "criadoEm"]
             }
           },
           "meta": {
@@ -1235,18 +1204,10 @@
                 "type": "integer"
               }
             },
-            "required": [
-              "page",
-              "limit",
-              "total",
-              "totalPages"
-            ]
+            "required": ["page", "limit", "total", "totalPages"]
           }
         },
-        "required": [
-          "items",
-          "meta"
-        ]
+        "required": ["items", "meta"]
       },
       "CriarComentarioDto": {
         "type": "object",
@@ -1256,9 +1217,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "texto"
-        ]
+        "required": ["texto"]
       },
       "ComentarioResponseDto": {
         "type": "object",
@@ -1282,23 +1241,13 @@
               },
               "perfil": {
                 "type": "string",
-                "enum": [
-                  "ALUNO",
-                  "PROFESSOR",
-                  "COMITE",
-                  "ADMIN"
-                ]
+                "enum": ["ALUNO", "PROFESSOR", "COMITE", "ADMIN"]
               },
               "ehAutorDaIniciativa": {
                 "type": "boolean"
               }
             },
-            "required": [
-              "id",
-              "nome",
-              "perfil",
-              "ehAutorDaIniciativa"
-            ]
+            "required": ["id", "nome", "perfil", "ehAutorDaIniciativa"]
           },
           "texto": {
             "type": "string"
@@ -1308,13 +1257,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "id",
-          "ciclo",
-          "autor",
-          "texto",
-          "criadoEm"
-        ]
+        "required": ["id", "ciclo", "autor", "texto", "criadoEm"]
       },
       "RegistrarVotoDto": {
         "type": "object",
@@ -1335,9 +1278,7 @@
             ]
           }
         },
-        "required": [
-          "valor"
-        ]
+        "required": ["valor"]
       },
       "ResultadoVotoResponseDto": {
         "type": "object",
@@ -1374,20 +1315,10 @@
           },
           "acao": {
             "type": "string",
-            "enum": [
-              "REGISTRADO",
-              "ALTERADO",
-              "RETIRADO"
-            ]
+            "enum": ["REGISTRADO", "ALTERADO", "RETIRADO"]
           }
         },
-        "required": [
-          "meuVoto",
-          "likes",
-          "dislikes",
-          "relevancia",
-          "acao"
-        ]
+        "required": ["meuVoto", "likes", "dislikes", "relevancia", "acao"]
       },
       "RegistrarDecisaoDto": {
         "type": "object",
@@ -1395,10 +1326,7 @@
           "resultado": {
             "description": "APROVADA ou REPROVADA",
             "type": "string",
-            "enum": [
-              "APROVADA",
-              "REPROVADA"
-            ]
+            "enum": ["APROVADA", "REPROVADA"]
           },
           "justificativa": {
             "description": "Obrigatória na reprovação (1 a 2000 caracteres); ignorada na aprovação",
@@ -1406,9 +1334,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "resultado"
-        ]
+        "required": ["resultado"]
       }
     }
   }

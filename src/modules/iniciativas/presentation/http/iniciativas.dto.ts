@@ -1,7 +1,7 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { STATUS_INICIATIVA } from '../../domain/status';
-import { PERIODICIDADES, TIPOS_INICIATIVA } from '../../domain/tipos';
+import { FORMATO_CODIGO_TIPO, PERIODICIDADES } from '../../domain/tipos';
 
 /**
  * Corpo de `POST /iniciativas`, `PATCH /iniciativas/:id` e `POST /iniciativas/:id/ressubmissao`.
@@ -14,7 +14,7 @@ export const DadosIniciativaSchema = z.object({
   tipo: z
     .string()
     .optional()
-    .describe(`Tipo: ${TIPOS_INICIATIVA.join(', ')}`),
+    .describe('Código de um tipo ativo do cadastro (GET /tipos-iniciativa), por exemplo PALESTRA'),
   titulo: z.string().optional().describe('Título (até 120 caracteres)'),
   resumo: z.string().optional().describe('Descrição resumida (até 280 caracteres)'),
   detalhe: z.string().optional().describe('Descrição detalhada (até 5000 caracteres)'),
@@ -43,6 +43,27 @@ export const DadosIniciativaSchema = z.object({
 
 export class DadosIniciativaDto extends createZodDto(DadosIniciativaSchema) {}
 
+/**
+ * Corpo de `PATCH /iniciativas/:id/datas`. Como em `DadosIniciativaSchema`, só os tipos;
+ * as regras de data e hora (RN-02) ficam no domínio e voltam num 422 com `errors`.
+ */
+export const DatasIniciativaSchema = z.object({
+  inicio: z.string().optional().describe('Data de início (YYYY-MM-DD)'),
+  fim: z.string().optional().describe('Data de término (YYYY-MM-DD), igual ou posterior ao início'),
+  horaInicio: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Hora de início (HH:mm), junto com horaFim; null para dia inteiro'),
+  horaFim: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Hora de término (HH:mm), posterior ao início; null para dia inteiro'),
+});
+
+export class DatasIniciativaDto extends createZodDto(DatasIniciativaSchema) {}
+
 const ListagemBase = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(500).default(20),
@@ -50,7 +71,7 @@ const ListagemBase = z.object({
 
 export const ListagemQuerySchema = ListagemBase.extend({
   status: z.enum(STATUS_INICIATIVA).optional().describe('Filtro por status'),
-  tipo: z.enum(TIPOS_INICIATIVA).optional().describe('Filtro por tipo'),
+  tipo: z.string().regex(FORMATO_CODIGO_TIPO).optional().describe('Filtro por código do tipo'),
   q: z.string().optional().describe('Busca em título, resumo, organizadores e espaço'),
   ordenar: z
     .enum(['relevancia', 'prazo', 'recentes', 'inicio'])
