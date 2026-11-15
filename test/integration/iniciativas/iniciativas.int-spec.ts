@@ -101,6 +101,70 @@ describe('Integração: iniciativas', () => {
     });
   });
 
+  describe('Submissão repetida (mesmo autor, título, data e horário de início)', () => {
+    const MENSAGEM = 'Você já submeteu uma iniciativa com este título, nesta data e neste horário.';
+    const contarComTitulo = (titulo: string) =>
+      t.prisma.iniciativa.count({ where: { titulo: { equals: titulo, mode: 'insensitive' } } });
+
+    it('a segunda submissão igual recebe 409 e nada é gravado', async () => {
+      const criada = await submeter('ana', { horaInicio: '09:00', horaFim: '11:00' });
+
+      const repetida = await (await t.req('ana'))
+        .post('/iniciativas')
+        .send(corpo({ titulo: criada.titulo, horaInicio: '09:00', horaFim: '11:00' }));
+
+      expect(repetida.status).toBe(409);
+      expect(repetida.body.detail).toBe(MENSAGEM);
+      expect(await contarComTitulo(criada.titulo)).toBe(1);
+    });
+
+    it('três envios simultâneos iguais (duplo clique) gravam uma iniciativa só', async () => {
+      const titulo = `Duplo clique ${crypto.randomUUID().slice(0, 8)}`;
+      const enviar = async () => (await t.req('ana')).post('/iniciativas').send(corpo({ titulo }));
+
+      const respostas = await Promise.all([enviar(), enviar(), enviar()]);
+
+      expect(respostas.map((r) => r.status).sort()).toEqual([201, 409, 409]);
+      expect(await contarComTitulo(titulo)).toBe(1);
+    });
+
+    it('o título é comparado sem diferenciar maiúsculas', async () => {
+      const criada = await submeter('ana');
+      const repetida = await (await t.req('ana'))
+        .post('/iniciativas')
+        .send(corpo({ titulo: criada.titulo.toUpperCase() }));
+      expect(repetida.status).toBe(409);
+    });
+
+    it('outro horário, outra data ou outro autor podem usar o mesmo título', async () => {
+      const criada = await submeter('ana', { horaInicio: '09:00', horaFim: '11:00' });
+      const mesmoTitulo = { titulo: criada.titulo };
+
+      await submeter('ana', { ...mesmoTitulo, horaInicio: '14:00', horaFim: '16:00' });
+      await submeter('ana', {
+        ...mesmoTitulo,
+        inicio: '2026-12-02',
+        horaInicio: '09:00',
+        horaFim: '11:00',
+      });
+      await submeter('carla', { ...mesmoTitulo, horaInicio: '09:00', horaFim: '11:00' });
+
+      expect(await contarComTitulo(criada.titulo)).toBe(4);
+    });
+
+    it('uma iniciativa reprovada não impede submeter de novo os mesmos dados', async () => {
+      const criada = await submeter('ana');
+      await t.prisma.iniciativa.update({
+        where: { id: criada.id },
+        data: { status: { connect: { code: 'REPROVADA' } } },
+      });
+
+      await submeter('ana', { titulo: criada.titulo });
+
+      expect(await contarComTitulo(criada.titulo)).toBe(2);
+    });
+  });
+
   describe('RN-08.5: a ordem do SQL bate com a função de domínio', () => {
     async function inserirEmVotacao(
       titulo: string,
