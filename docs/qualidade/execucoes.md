@@ -8,9 +8,28 @@ Ambiente: Windows 11, Node 24.16.0, Vitest 4.1.8, Postgres 14 no Docker (porta 5
 O banco de testes `BD-SICIN-TEST` é recriado antes de cada execução completa:
 `node scripts/prepare-database.mjs BD-SICIN-TEST --reset`.
 
-## Execução de base
+## Execução de base (vale para as refatorações)
 
-15/11/2026, 16:05. Commit `d8c4e3a` (tag `sprint3-parte1-medicao`), antes de qualquer refatoração.
+15/11/2026, 18:20. Commit `245eff6` do `main`, que acrescenta a recusa da submissão repetida
+(`feat(iniciativas)`, uma mudança de comportamento pedida pela dona do produto, fora das
+refatorações). O código do branch `refactor/sprint3-divida-tecnica` foi atualizado com esse
+commit (merge `e9a6037`) e é idêntico ao do `main`. Ainda antes de qualquer refatoração.
+
+| Suíte | Comando | Resultado |
+|---|---|---|
+| v2 | `npx vitest run tests/v2` | 177 / 177 passando |
+| Unitários + v2 (sem a v1) | `npm test` | 38 arquivos, 589 / 589 passando |
+| v1 (contrato) | `npm run test:v1` | 80 testes: 75 passando, 5 falhando (as mesmas falhas esperadas, abaixo) |
+| Integração | `npm run test:int` | 8 arquivos, 94 / 94 passando |
+| E2E (API) | `npm run test:e2e` | 3 arquivos, 42 / 42 passando |
+
+A regra nova não mudou o resultado da v1 nem o da v2: nenhum teste delas submete a mesma
+iniciativa duas vezes, e nenhum arquivo delas foi alterado. Os 11 testes unitários e os 5 de
+integração a mais são os da regra nova.
+
+## Primeira execução de base (histórico)
+
+15/11/2026, 16:05. Commit `d8c4e3a` (tag `sprint3-parte1-medicao`), antes da regra nova.
 
 | Suíte | Comando | Resultado |
 |---|---|---|
