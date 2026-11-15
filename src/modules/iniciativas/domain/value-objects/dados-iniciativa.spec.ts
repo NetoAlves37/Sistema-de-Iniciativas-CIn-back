@@ -2,9 +2,14 @@ import { dadosValidos } from '@/modules/iniciativas/testing/builders/iniciativa.
 import { ValidacaoError } from '@/shared/domain/domain-error';
 import { DadosIniciativa, type DadosIniciativaBrutos, LIMITES } from './dados-iniciativa';
 
-function errosDe(brutos: DadosIniciativaBrutos): Record<string, string> {
+const TIPOS_ATIVOS = new Set(['EXTENSAO', 'PESQUISA', 'EVENTO']);
+
+function errosDe(
+  brutos: DadosIniciativaBrutos,
+  tipos: ReadonlySet<string> = TIPOS_ATIVOS,
+): Record<string, string> {
   try {
-    DadosIniciativa.criar(brutos);
+    DadosIniciativa.criar(brutos, tipos);
   } catch (error) {
     if (error instanceof ValidacaoError) return error.campos;
     throw error;
@@ -104,8 +109,13 @@ describe('DadosIniciativa: RN-01 (campos)', () => {
     });
   });
 
-  it('rejeita tipo e periodicidade fora da lista', () => {
-    expect(errosDe(dadosValidos({ tipo: 'OFICINA' }))).toEqual({ tipo: 'Selecione o tipo.' });
+  it('rejeita tipo fora dos tipos ativos do cadastro, e periodicidade fora da lista', () => {
+    expect(errosDe(dadosValidos({ tipo: 'OFICINA' }))).toEqual({
+      tipo: 'Este tipo não existe ou foi desativado. Selecione outro.',
+    });
+    expect(errosDe(dadosValidos({ tipo: 'oficina de código' }))).toEqual({
+      tipo: 'Selecione o tipo.',
+    });
     expect(errosDe(dadosValidos({ periodicidade: 'ANUAL' }))).toEqual({
       periodicidade: 'Selecione a periodicidade.',
     });
@@ -169,6 +179,19 @@ describe('DadosIniciativa: RN-02 (datas e horário)', () => {
     expect(errosDe(dadosValidos({ horaInicio: '25:00', horaFim: '26:00' }))).toEqual({
       horaInicio: 'Informe uma hora de início válida.',
       horaFim: 'Informe uma hora de término válida.',
+    });
+  });
+});
+
+describe('DadosIniciativa: tipos do cadastro', () => {
+  it('aceita qualquer tipo ativo cadastrado, como PALESTRA', () => {
+    const dados = DadosIniciativa.criar(dadosValidos({ tipo: 'PALESTRA' }), new Set(['PALESTRA']));
+    expect(dados.tipo).toBe('PALESTRA');
+  });
+
+  it('sem nenhum tipo cadastrado, nenhuma iniciativa pode ser submetida', () => {
+    expect(errosDe(dadosValidos({ tipo: 'EVENTO' }), new Set())).toEqual({
+      tipo: 'Este tipo não existe ou foi desativado. Selecione outro.',
     });
   });
 });

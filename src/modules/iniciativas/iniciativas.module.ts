@@ -16,6 +16,7 @@ import type { SugestoesPort } from './application/ports/sugestoes.port';
 import type { UsuariosPort } from './application/ports/usuarios.port';
 import type { VotosPort } from './application/ports/votos.port';
 import { ConsultasIniciativas } from './application/queries/consultas-iniciativas';
+import { AlterarDatasIniciativa } from './application/use-cases/alterar-datas-iniciativa';
 import { AlterarIniciativa } from './application/use-cases/alterar-iniciativa';
 import { AplicarPrazosVencidos } from './application/use-cases/aplicar-prazos-vencidos';
 import { CarregarComPrazos } from './application/use-cases/carregar-com-prazos';
@@ -23,8 +24,15 @@ import { DecidirIniciativa } from './application/use-cases/decidir-iniciativa';
 import { EditarIniciativa } from './application/use-cases/editar-iniciativa';
 import { RessubmeterIniciativa } from './application/use-cases/ressubmeter-iniciativa';
 import { SubmeterIniciativa } from './application/use-cases/submeter-iniciativa';
+import {
+  AlterarTipo,
+  CadastrarTipo,
+  ExcluirTipo,
+  ListarTipos,
+} from './application/use-cases/tipos-iniciativa';
 import type { IniciativaRepository } from './domain/ports/iniciativa.repository';
 import type { PrazosConfig } from './domain/ports/prazos-config';
+import type { TipoRepository } from './domain/ports/tipo.repository';
 import { EventosAdapter } from './infrastructure/adapters/eventos.adapter';
 import { GoogleAgendaAdapter } from './infrastructure/adapters/google-agenda.adapter';
 import { SugestoesAdapter } from './infrastructure/adapters/sugestoes.adapter';
@@ -33,6 +41,7 @@ import { VotosAdapter } from './infrastructure/adapters/votos.adapter';
 import { prazosDaConfiguracao } from './infrastructure/config/prazos.provider';
 import { IniciativaListagemQuery } from './infrastructure/persistence/iniciativa-listagem.query';
 import { PrismaIniciativaRepository } from './infrastructure/persistence/prisma-iniciativa.repository';
+import { PrismaTipoRepository } from './infrastructure/persistence/prisma-tipo.repository';
 import { TransicoesJob } from './infrastructure/scheduler/transicoes.job';
 import {
   EVENTOS_PORT,
@@ -41,11 +50,13 @@ import {
   INICIATIVA_REPOSITORY,
   PRAZOS_CONFIG,
   SUGESTOES_PORT,
+  TIPO_REPOSITORY,
   TRANSACAO_PORT,
   USUARIOS_PORT,
   VOTOS_PORT,
 } from './iniciativas.tokens';
 import { IniciativasController } from './presentation/http/iniciativas.controller';
+import { TiposIniciativaController } from './presentation/http/tipos-iniciativa.controller';
 
 @Module({
   imports: [
@@ -54,10 +65,11 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
     forwardRef(() => VotacaoModule),
     forwardRef(() => DivulgacaoModule),
   ],
-  controllers: [IniciativasController],
+  controllers: [IniciativasController, TiposIniciativaController],
   providers: [
     { provide: INICIATIVA_REPOSITORY, useClass: PrismaIniciativaRepository },
     { provide: INICIATIVA_LEITURA, useClass: IniciativaListagemQuery },
+    { provide: TIPO_REPOSITORY, useClass: PrismaTipoRepository },
     { provide: USUARIOS_PORT, useClass: UsuariosAdapter },
     { provide: SUGESTOES_PORT, useClass: SugestoesAdapter },
     { provide: VOTOS_PORT, useClass: VotosAdapter },
@@ -84,8 +96,16 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
         eventos: EventosPort,
         clock: Clock,
         prazos: PrazosConfig,
-      ) => new SubmeterIniciativa(repositorio, transacao, eventos, clock, prazos),
-      inject: [INICIATIVA_REPOSITORY, TRANSACAO_PORT, EVENTOS_PORT, CLOCK, PRAZOS_CONFIG],
+        tipos: TipoRepository,
+      ) => new SubmeterIniciativa(repositorio, transacao, eventos, clock, prazos, tipos),
+      inject: [
+        INICIATIVA_REPOSITORY,
+        TRANSACAO_PORT,
+        EVENTOS_PORT,
+        CLOCK,
+        PRAZOS_CONFIG,
+        TIPO_REPOSITORY,
+      ],
     },
     {
       provide: AlterarIniciativa,
@@ -99,20 +119,53 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
     },
     {
       provide: EditarIniciativa,
-      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
-        new EditarIniciativa(alterar, clock),
-      inject: [AlterarIniciativa, CLOCK],
+      useFactory: (alterar: AlterarIniciativa, clock: Clock, tipos: TipoRepository) =>
+        new EditarIniciativa(alterar, clock, tipos),
+      inject: [AlterarIniciativa, CLOCK, TIPO_REPOSITORY],
     },
     {
       provide: RessubmeterIniciativa,
-      useFactory: (alterar: AlterarIniciativa, clock: Clock, prazos: PrazosConfig) =>
-        new RessubmeterIniciativa(alterar, clock, prazos),
-      inject: [AlterarIniciativa, CLOCK, PRAZOS_CONFIG],
+      useFactory: (
+        alterar: AlterarIniciativa,
+        clock: Clock,
+        prazos: PrazosConfig,
+        tipos: TipoRepository,
+      ) => new RessubmeterIniciativa(alterar, clock, prazos, tipos),
+      inject: [AlterarIniciativa, CLOCK, PRAZOS_CONFIG, TIPO_REPOSITORY],
     },
     {
       provide: DecidirIniciativa,
       useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
         new DecidirIniciativa(alterar, clock),
+      inject: [AlterarIniciativa, CLOCK],
+    },
+    {
+      provide: ListarTipos,
+      useFactory: (tipos: TipoRepository) => new ListarTipos(tipos),
+      inject: [TIPO_REPOSITORY],
+    },
+    {
+      provide: CadastrarTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new CadastrarTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: AlterarTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new AlterarTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: ExcluirTipo,
+      useFactory: (tipos: TipoRepository, transacao: TransacaoPort, clock: Clock) =>
+        new ExcluirTipo(tipos, transacao, clock),
+      inject: [TIPO_REPOSITORY, TRANSACAO_PORT, CLOCK],
+    },
+    {
+      provide: AlterarDatasIniciativa,
+      useFactory: (alterar: AlterarIniciativa, clock: Clock) =>
+        new AlterarDatasIniciativa(alterar, clock),
       inject: [AlterarIniciativa, CLOCK],
     },
     {
@@ -161,7 +214,18 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
         consultas: ConsultasIniciativas,
         carregar: CarregarComPrazos,
         job: AplicarPrazosVencidos,
-      ) => new IniciativasFacade(submeter, editar, ressubmeter, decidir, consultas, carregar, job),
+        alterarDatas: AlterarDatasIniciativa,
+      ) =>
+        new IniciativasFacade(
+          submeter,
+          editar,
+          ressubmeter,
+          decidir,
+          consultas,
+          carregar,
+          job,
+          alterarDatas,
+        ),
       inject: [
         SubmeterIniciativa,
         EditarIniciativa,
@@ -170,6 +234,7 @@ import { IniciativasController } from './presentation/http/iniciativas.controlle
         ConsultasIniciativas,
         CarregarComPrazos,
         AplicarPrazosVencidos,
+        AlterarDatasIniciativa,
       ],
     },
     TransicoesJob,

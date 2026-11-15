@@ -1,4 +1,4 @@
-// Seed de DESENVOLVIMENTO / demonstração (IT-06). Nunca roda em produção.
+// Seed de DESENVOLVIMENTO / demonstração (IT-06). Nunca roda em produção (travas abaixo).
 //
 //   npm run seed
 //
@@ -14,10 +14,42 @@ try {
   // sem .env: usa o ambiente
 }
 
+// --- travas (ADR-025): dados de exemplo NUNCA podem chegar a um banco real -----------------
+// 1. NODE_ENV=production: recusa sempre, sem exceção.
+// 2. Banco fora desta máquina: recusa, a menos que PERMITIR_SEED_DEMO=true (por exemplo, um
+//    servidor de demonstração). O banco de produção nunca é local, então fica protegido mesmo
+//    que o deploy esqueça o NODE_ENV.
+const HOSTS_LOCAIS = new Set([
+  'localhost',
+  '127.0.0.1',
+  '::1',
+  '[::1]',
+  'postgres',
+  'host.docker.internal',
+]);
+
 if (process.env.NODE_ENV === 'production') {
   console.error('O seed de demonstração não roda em produção (NODE_ENV=production).');
   process.exit(1);
 }
+
+let alvo;
+try {
+  alvo = new URL(process.env.DATABASE_URL ?? '');
+} catch {
+  console.error('DATABASE_URL ausente ou inválida: o seed não sabe em qual banco gravaria.');
+  process.exit(1);
+}
+const descricaoDoAlvo = `${alvo.hostname}:${alvo.port || '5432'}${decodeURIComponent(alvo.pathname)}`;
+if (!HOSTS_LOCAIS.has(alvo.hostname.toLowerCase()) && process.env.PERMITIR_SEED_DEMO !== 'true') {
+  console.error(
+    `Seed recusado: o banco ${descricaoDoAlvo} não está nesta máquina. Os dados de exemplo ` +
+      '(usuários e iniciativas fictícios) só vão para bancos locais. Para um servidor de ' +
+      'demonstração, defina PERMITIR_SEED_DEMO=true. NUNCA faça isso em produção.',
+  );
+  process.exit(1);
+}
+console.log(`Seed de demonstração no banco ${descricaoDoAlvo}.`);
 
 const prisma = new PrismaClient();
 
@@ -35,6 +67,13 @@ const USUARIOS = {
 };
 
 const TIPO = { Extensão: 'EXTENSAO', Pesquisa: 'PESQUISA', Evento: 'EVENTO' };
+// Os tipos são um cadastro (tela "Tipos de iniciativa") e um banco novo começa sem nenhum.
+// As iniciativas de exemplo usam estes três, então o seed os cadastra se faltarem.
+const TIPOS_DO_SEED = [
+  { code: 'EXTENSAO', label: 'Extensão', cor: '#9BE0A0' },
+  { code: 'PESQUISA', label: 'Pesquisa', cor: '#A7C7F2' },
+  { code: 'EVENTO', label: 'Evento', cor: '#F7AE85' },
+];
 const PERIODICIDADE = {
   'Evento único': 'EVENTO_UNICO',
   Diária: 'DIARIA',
@@ -52,7 +91,10 @@ function wilson(pos, n) {
   if (!n) return 0;
   const z = 1.96;
   const p = pos / n;
-  return (p + (z * z) / (2 * n) - z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n)) / (1 + (z * z) / n);
+  return (
+    (p + (z * z) / (2 * n) - z * Math.sqrt((p * (1 - p) + (z * z) / (4 * n)) / n)) /
+    (1 + (z * z) / n)
+  );
 }
 
 // --- iniciativas de exemplo ---------------------------------------------------------------
@@ -70,128 +112,340 @@ const fluxoAprovada = (autor, d0) => [
 
 const INICIATIVAS = [
   {
-    n: 1, autor: 'u2', tipo: 'Evento', titulo: 'Hackathon de Acessibilidade Digital',
+    n: 1,
+    autor: 'u2',
+    tipo: 'Evento',
+    titulo: 'Hackathon de Acessibilidade Digital',
     resumo: 'Maratona de 24h para criar soluções que tornem sistemas da UFPE mais acessíveis.',
-    detalhe: 'Equipes de até 5 pessoas desenvolvem protótipos voltados a pessoas com deficiência visual, auditiva e motora. Mentoria do NACE e premiação para os três melhores projetos.',
-    inicio: 9, fim: 10, per: 'Evento único', org: 'Bruno Lima, Diretório Acadêmico', membros: 'Ana Souza, Diego Alves',
-    part: 80, espaco: 'Auditório do CIn', horas: ['09:00', '18:00'], status: 'APROVADA', votos: [34, 3], decisor: 'u3', decidida: -2,
+    detalhe:
+      'Equipes de até 5 pessoas desenvolvem protótipos voltados a pessoas com deficiência visual, auditiva e motora. Mentoria do NACE e premiação para os três melhores projetos.',
+    inicio: 9,
+    fim: 10,
+    per: 'Evento único',
+    org: 'Bruno Lima, Diretório Acadêmico',
+    membros: 'Ana Souza, Diego Alves',
+    part: 80,
+    espaco: 'Auditório do CIn',
+    horas: ['09:00', '18:00'],
+    status: 'APROVADA',
+    votos: [34, 3],
+    decisor: 'u3',
+    decidida: -2,
     historico: [...fluxoAprovada('u2', -14), [-2, 'EM_ANALISE', 'APROVADA', 'u3', APROVADA]],
   },
   {
-    n: 2, autor: 'u1', tipo: 'Pesquisa', titulo: 'Grupo de Estudos em IA Responsável',
-    resumo: 'Encontros semanais para ler e discutir artigos sobre viés, transparência e ética em IA.',
-    detalhe: 'Cada encontro tem um relator que apresenta um artigo. Ao final do semestre, o grupo produz um relatório técnico aberto.',
-    inicio: -12, fim: 60, per: 'Semanal', org: 'Ana Souza', membros: 'Bruno Lima (orientador)', part: 20, espaco: 'Sala E-112',
-    horas: ['14:00', '16:00'], status: 'APROVADA', votos: [21, 2], decisor: 'u3', decidida: -20, criada: -40,
-    historico: [[-38, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA], [-35, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
-      [-32, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT], [-20, 'EM_ANALISE', 'APROVADA', 'u3', APROVADA]],
+    n: 2,
+    autor: 'u1',
+    tipo: 'Pesquisa',
+    titulo: 'Grupo de Estudos em IA Responsável',
+    resumo:
+      'Encontros semanais para ler e discutir artigos sobre viés, transparência e ética em IA.',
+    detalhe:
+      'Cada encontro tem um relator que apresenta um artigo. Ao final do semestre, o grupo produz um relatório técnico aberto.',
+    inicio: -12,
+    fim: 60,
+    per: 'Semanal',
+    org: 'Ana Souza',
+    membros: 'Bruno Lima (orientador)',
+    part: 20,
+    espaco: 'Sala E-112',
+    horas: ['14:00', '16:00'],
+    status: 'APROVADA',
+    votos: [21, 2],
+    decisor: 'u3',
+    decidida: -20,
+    criada: -40,
+    historico: [
+      [-38, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA],
+      [-35, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+      [-32, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT],
+      [-20, 'EM_ANALISE', 'APROVADA', 'u3', APROVADA],
+    ],
   },
   {
-    n: 3, autor: 'u4', tipo: 'Extensão', titulo: 'Mutirão de Inclusão Digital',
-    resumo: 'Um dia de atendimento gratuito à comunidade do entorno para uso de celular e serviços gov.br.',
-    detalhe: 'Voluntários atendem moradores em estações por tema: cadastro gov.br, golpes no WhatsApp, uso de aplicativos de banco.',
-    inicio: 4, fim: 4, per: 'Evento único', org: 'Diego Alves', membros: 'Ana Souza', part: 40, espaco: 'Laboratório G1',
-    horas: ['08:00', '12:00'], status: 'APROVADA', votos: [19, 0], decisor: 'u3', decidida: -4,
+    n: 3,
+    autor: 'u4',
+    tipo: 'Extensão',
+    titulo: 'Mutirão de Inclusão Digital',
+    resumo:
+      'Um dia de atendimento gratuito à comunidade do entorno para uso de celular e serviços gov.br.',
+    detalhe:
+      'Voluntários atendem moradores em estações por tema: cadastro gov.br, golpes no WhatsApp, uso de aplicativos de banco.',
+    inicio: 4,
+    fim: 4,
+    per: 'Evento único',
+    org: 'Diego Alves',
+    membros: 'Ana Souza',
+    part: 40,
+    espaco: 'Laboratório G1',
+    horas: ['08:00', '12:00'],
+    status: 'APROVADA',
+    votos: [19, 0],
+    decisor: 'u3',
+    decidida: -4,
     historico: [...fluxoAprovada('u4', -14), [-4, 'EM_ANALISE', 'APROVADA', 'u3', APROVADA]],
   },
   {
-    n: 4, autor: 'u2', tipo: 'Extensão', titulo: 'Plantão de Dúvidas de Algoritmos',
-    resumo: 'Plantão quinzenal aberto a qualquer estudante com dúvidas de Algoritmos e Estruturas de Dados.',
+    n: 4,
+    autor: 'u2',
+    tipo: 'Extensão',
+    titulo: 'Plantão de Dúvidas de Algoritmos',
+    resumo:
+      'Plantão quinzenal aberto a qualquer estudante com dúvidas de Algoritmos e Estruturas de Dados.',
     detalhe: 'Monitores e professor se revezam. Não precisa de inscrição.',
-    inicio: -20, fim: 40, per: 'Quinzenal', org: 'Bruno Lima', membros: 'Monitores de AED', part: 30, espaco: 'Sala D-005',
-    horas: ['18:30', '20:30'], status: 'APROVADA', votos: [15, 1], decisor: 'u5', decidida: -22, criada: -35,
+    inicio: -20,
+    fim: 40,
+    per: 'Quinzenal',
+    org: 'Bruno Lima',
+    membros: 'Monitores de AED',
+    part: 30,
+    espaco: 'Sala D-005',
+    horas: ['18:30', '20:30'],
+    status: 'APROVADA',
+    votos: [15, 1],
+    decisor: 'u5',
+    decidida: -22,
+    criada: -35,
     historico: [...fluxoAprovada('u2', -33), [-22, 'EM_ANALISE', 'APROVADA', 'u5', APROVADA]],
   },
   {
-    n: 5, autor: 'u4', tipo: 'Extensão', titulo: 'Oficina de Programação para Escolas Públicas',
-    resumo: 'Oficinas de lógica de programação com Scratch para alunos do ensino fundamental da rede pública.',
-    detalhe: 'Parceria com duas escolas da Várzea. Seis encontros de 2h. Os alunos do CIn atuam como instrutores.',
-    inicio: 20, fim: 62, per: 'Semanal', org: 'Diego Alves', membros: 'Ana Souza, Bruno Lima', part: 35, espaco: 'Laboratório G2',
-    status: 'EM_VOTACAO', fimRef: -1, fimVot: 2 + 3 / 24, votos: [18, 2, ['u2']],
-    comentarios: [['u2', 'Sugiro incluir um encontro final de apresentação dos projetos para as famílias.', -3],
-      ['u4', 'Boa ideia, incluí o encontro de encerramento.', -2.5]],
-    historico: [[-4, null, 'EM_ANDAMENTO', 'u4', SUBMETIDA], [-1, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF]],
+    n: 5,
+    autor: 'u4',
+    tipo: 'Extensão',
+    titulo: 'Oficina de Programação para Escolas Públicas',
+    resumo:
+      'Oficinas de lógica de programação com Scratch para alunos do ensino fundamental da rede pública.',
+    detalhe:
+      'Parceria com duas escolas da Várzea. Seis encontros de 2h. Os alunos do CIn atuam como instrutores.',
+    inicio: 20,
+    fim: 62,
+    per: 'Semanal',
+    org: 'Diego Alves',
+    membros: 'Ana Souza, Bruno Lima',
+    part: 35,
+    espaco: 'Laboratório G2',
+    status: 'EM_VOTACAO',
+    fimRef: -1,
+    fimVot: 2 + 3 / 24,
+    votos: [18, 2, ['u2']],
+    comentarios: [
+      ['u2', 'Sugiro incluir um encontro final de apresentação dos projetos para as famílias.', -3],
+      ['u4', 'Boa ideia, incluí o encontro de encerramento.', -2.5],
+    ],
+    historico: [
+      [-4, null, 'EM_ANDAMENTO', 'u4', SUBMETIDA],
+      [-1, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+    ],
   },
   {
-    n: 6, autor: 'u2', tipo: 'Evento', titulo: 'Maratona Interna de Programação',
+    n: 6,
+    autor: 'u2',
+    tipo: 'Evento',
+    titulo: 'Maratona Interna de Programação',
     resumo: 'Seletiva interna para formar os times do CIn na Maratona SBC.',
     detalhe: 'Prova de 5 horas no estilo ICPC, com problemas inéditos.',
-    inicio: 30, fim: 30, per: 'Evento único', org: 'Bruno Lima', membros: 'Treinadores da maratona', part: 60,
-    espaco: 'Laboratórios G1 e G2', status: 'EM_VOTACAO', fimRef: -2, fimVot: 1, votos: [6, 0],
-    historico: [[-5, null, 'EM_ANDAMENTO', 'u2', SUBMETIDA], [-2, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF]],
+    inicio: 30,
+    fim: 30,
+    per: 'Evento único',
+    org: 'Bruno Lima',
+    membros: 'Treinadores da maratona',
+    part: 60,
+    espaco: 'Laboratórios G1 e G2',
+    status: 'EM_VOTACAO',
+    fimRef: -2,
+    fimVot: 1,
+    votos: [6, 0],
+    historico: [
+      [-5, null, 'EM_ANDAMENTO', 'u2', SUBMETIDA],
+      [-2, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+    ],
   },
   {
-    n: 7, autor: 'u1', tipo: 'Evento', titulo: 'Sala de Descompressão Gamer',
-    resumo: 'Espaço com consoles e jogos de tabuleiro aberto nos intervalos, durante a semana de provas.',
+    n: 7,
+    autor: 'u1',
+    tipo: 'Evento',
+    titulo: 'Sala de Descompressão Gamer',
+    resumo:
+      'Espaço com consoles e jogos de tabuleiro aberto nos intervalos, durante a semana de provas.',
     detalhe: 'Uso de uma sala ociosa durante a semana de provas, com escala de voluntários.',
-    inicio: 35, fim: 40, per: 'Diária', org: 'Ana Souza', membros: '', part: 25, espaco: 'Sala E-201',
-    status: 'EM_VOTACAO', fimRef: -1, fimVot: 3, votos: [9, 11],
-    historico: [[-4, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA], [-1, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF]],
+    inicio: 35,
+    fim: 40,
+    per: 'Diária',
+    org: 'Ana Souza',
+    membros: '',
+    part: 25,
+    espaco: 'Sala E-201',
+    status: 'EM_VOTACAO',
+    fimRef: -1,
+    fimVot: 3,
+    votos: [9, 11],
+    historico: [
+      [-4, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA],
+      [-1, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+    ],
   },
   {
-    n: 8, autor: 'u1', tipo: 'Extensão', titulo: 'Monitoria Colaborativa de Cálculo',
+    n: 8,
+    autor: 'u1',
+    tipo: 'Extensão',
+    titulo: 'Monitoria Colaborativa de Cálculo',
     resumo: 'Grupos de estudo guiados por veteranos para calouros com dificuldade em Cálculo 1.',
     detalhe: 'Encontros em pequenos grupos de até 6 calouros, com listas de exercícios comentadas.',
-    inicio: 15, fim: 75, per: 'Semanal', org: 'Ana Souza', membros: 'Diego Alves', part: 36, espaco: 'Sala D-010',
-    status: 'EM_ANDAMENTO', fimRef: 1 + 5 / 24,
-    comentarios: [['u2', 'Vale combinar os horários com a monitoria oficial para não coincidir.', -1],
-      ['u4', 'Posso ajudar com as listas de limites e derivadas.', -0.6], ['u1', 'Obrigada! Vou alinhar os horários com a coordenação.', -0.3]],
+    inicio: 15,
+    fim: 75,
+    per: 'Semanal',
+    org: 'Ana Souza',
+    membros: 'Diego Alves',
+    part: 36,
+    espaco: 'Sala D-010',
+    status: 'EM_ANDAMENTO',
+    fimRef: 1 + 5 / 24,
+    comentarios: [
+      ['u2', 'Vale combinar os horários com a monitoria oficial para não coincidir.', -1],
+      ['u4', 'Posso ajudar com as listas de limites e derivadas.', -0.6],
+      ['u1', 'Obrigada! Vou alinhar os horários com a coordenação.', -0.3],
+    ],
     historico: [[-2, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA]],
   },
   {
-    n: 9, autor: 'u2', tipo: 'Extensão', titulo: 'Podcast Bits do CIn',
+    n: 9,
+    autor: 'u2',
+    tipo: 'Extensão',
+    titulo: 'Podcast Bits do CIn',
     resumo: 'Podcast quinzenal com entrevistas de egressos e pesquisadores do Centro.',
-    detalhe: 'Episódios de 30 minutos gravados no estúdio da Rádio Universitária e publicados nas plataformas do CIn.',
-    inicio: 25, fim: 120, per: 'Quinzenal', org: 'Bruno Lima', membros: 'Ana Souza', part: 4, espaco: 'Estúdio da Rádio Universitária',
-    status: 'EM_ANDAMENTO', fimRef: 2,
-    comentarios: [['u3', 'Seria interessante ter episódios sobre as iniciativas aprovadas aqui na plataforma.', -0.4]],
+    detalhe:
+      'Episódios de 30 minutos gravados no estúdio da Rádio Universitária e publicados nas plataformas do CIn.',
+    inicio: 25,
+    fim: 120,
+    per: 'Quinzenal',
+    org: 'Bruno Lima',
+    membros: 'Ana Souza',
+    part: 4,
+    espaco: 'Estúdio da Rádio Universitária',
+    status: 'EM_ANDAMENTO',
+    fimRef: 2,
+    comentarios: [
+      [
+        'u3',
+        'Seria interessante ter episódios sobre as iniciativas aprovadas aqui na plataforma.',
+        -0.4,
+      ],
+    ],
     historico: [[-1, null, 'EM_ANDAMENTO', 'u2', SUBMETIDA]],
   },
   {
     // HU-26: iniciativa SEM votação. Ao fim do refinamento vai direto para a análise.
-    n: 10, autor: 'u1', tipo: 'Extensão', titulo: 'Clube de Xadrez do CIn', comVotacao: false,
+    n: 10,
+    autor: 'u1',
+    tipo: 'Extensão',
+    titulo: 'Clube de Xadrez do CIn',
+    comVotacao: false,
     resumo: 'Encontros semanais de xadrez abertos a toda a comunidade, com aulas para iniciantes.',
-    detalhe: 'Tabuleiros e relógios emprestados pelo Diretório Acadêmico. Sem votação geral: segue direto para o comitê ao fim do prazo de sugestões.',
-    inicio: 12, fim: 90, per: 'Semanal', org: 'Ana Souza', membros: 'Diego Alves', part: 24, espaco: 'Sala E-110',
-    horas: ['17:00', '19:00'], status: 'EM_ANDAMENTO', fimRef: 2,
+    detalhe:
+      'Tabuleiros e relógios emprestados pelo Diretório Acadêmico. Sem votação geral: segue direto para o comitê ao fim do prazo de sugestões.',
+    inicio: 12,
+    fim: 90,
+    per: 'Semanal',
+    org: 'Ana Souza',
+    membros: 'Diego Alves',
+    part: 24,
+    espaco: 'Sala E-110',
+    horas: ['17:00', '19:00'],
+    status: 'EM_ANDAMENTO',
+    fimRef: 2,
     comentarios: [['u4', 'Posso trazer dois tabuleiros extras.', -0.2]],
     historico: [[-1, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA]],
   },
   {
-    n: 11, autor: 'u3', tipo: 'Pesquisa', titulo: 'Laboratório Aberto de Robótica',
-    resumo: 'Abertura do laboratório de robótica às sextas para projetos de alunos de qualquer período.',
-    detalhe: 'Alunos propõem projetos curtos e usam kits do laboratório com supervisão de um bolsista.',
-    inicio: 14, fim: 90, per: 'Semanal', org: 'Carla Menezes', membros: 'Bolsistas do laboratório', part: 15,
-    espaco: 'Laboratório de Robótica', status: 'EM_ANALISE', fimRef: -5, fimVot: -1, votos: [22, 4],
-    historico: [[-9, null, 'EM_ANDAMENTO', 'u3', SUBMETIDA], [-5, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
-      [-1, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT]],
+    n: 11,
+    autor: 'u3',
+    tipo: 'Pesquisa',
+    titulo: 'Laboratório Aberto de Robótica',
+    resumo:
+      'Abertura do laboratório de robótica às sextas para projetos de alunos de qualquer período.',
+    detalhe:
+      'Alunos propõem projetos curtos e usam kits do laboratório com supervisão de um bolsista.',
+    inicio: 14,
+    fim: 90,
+    per: 'Semanal',
+    org: 'Carla Menezes',
+    membros: 'Bolsistas do laboratório',
+    part: 15,
+    espaco: 'Laboratório de Robótica',
+    status: 'EM_ANALISE',
+    fimRef: -5,
+    fimVot: -1,
+    votos: [22, 4],
+    historico: [
+      [-9, null, 'EM_ANDAMENTO', 'u3', SUBMETIDA],
+      [-5, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+      [-1, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT],
+    ],
   },
   {
-    n: 12, autor: 'u4', tipo: 'Evento', titulo: 'Semana de Boas-vindas dos Calouros',
+    n: 12,
+    autor: 'u4',
+    tipo: 'Evento',
+    titulo: 'Semana de Boas-vindas dos Calouros',
     resumo: 'Programação de acolhimento com tour pelo CIn, palestras curtas e gincana.',
     detalhe: 'Cinco dias de atividades no início do semestre, organizadas por veteranos e pelo DA.',
-    inicio: 40, fim: 44, per: 'Diária', org: 'Diego Alves, Diretório Acadêmico', membros: 'Ana Souza', part: 150,
-    espaco: 'Hall e auditório do CIn', status: 'EM_ANALISE', fimRef: -6, fimVot: -2, votos: [27, 1],
-    historico: [[-10, null, 'EM_ANDAMENTO', 'u4', SUBMETIDA], [-6, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
-      [-2, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT]],
+    inicio: 40,
+    fim: 44,
+    per: 'Diária',
+    org: 'Diego Alves, Diretório Acadêmico',
+    membros: 'Ana Souza',
+    part: 150,
+    espaco: 'Hall e auditório do CIn',
+    status: 'EM_ANALISE',
+    fimRef: -6,
+    fimVot: -2,
+    votos: [27, 1],
+    historico: [
+      [-10, null, 'EM_ANDAMENTO', 'u4', SUBMETIDA],
+      [-6, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+      [-2, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT],
+    ],
   },
   {
-    n: 13, autor: 'u1', tipo: 'Evento', titulo: 'Semana de Carreiras em Tech',
+    n: 13,
+    autor: 'u1',
+    tipo: 'Evento',
+    titulo: 'Semana de Carreiras em Tech',
     resumo: 'Uma semana de palestras e rodas de conversa com profissionais do mercado.',
     detalhe: 'Palestras diárias no fim da tarde, com empresas do Porto Digital.',
-    inicio: 12, fim: 16, per: 'Diária', org: 'Ana Souza', membros: 'Diego Alves', part: 120, espaco: 'Auditório do CIn',
-    status: 'REPROVADA', fimRef: -8, fimVot: -5, votos: [30, 5], decisor: 'u3', decidida: -1,
-    justificativa: 'O período coincide com a semana de provas do calendário acadêmico e o auditório já está reservado. Sugerimos mover para depois das provas e detalhar a lista de empresas confirmadas.',
+    inicio: 12,
+    fim: 16,
+    per: 'Diária',
+    org: 'Ana Souza',
+    membros: 'Diego Alves',
+    part: 120,
+    espaco: 'Auditório do CIn',
+    status: 'REPROVADA',
+    fimRef: -8,
+    fimVot: -5,
+    votos: [30, 5],
+    decisor: 'u3',
+    decidida: -1,
+    justificativa:
+      'O período coincide com a semana de provas do calendário acadêmico e o auditório já está reservado. Sugerimos mover para depois das provas e detalhar a lista de empresas confirmadas.',
     comentarios: [['u4', 'Dá para incluir uma sessão de revisão de currículos?', -8]],
-    historico: [[-12, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA], [-8, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
+    historico: [
+      [-12, null, 'EM_ANDAMENTO', 'u1', SUBMETIDA],
+      [-8, 'EM_ANDAMENTO', 'EM_VOTACAO', 'SISTEMA', REF],
       [-5, 'EM_VOTACAO', 'EM_ANALISE', 'SISTEMA', VOT],
-      [-1, 'EM_ANALISE', 'REPROVADA', 'u3', 'Reprovada pelo comitê', 'justificativa']],
+      [-1, 'EM_ANALISE', 'REPROVADA', 'u3', 'Reprovada pelo comitê', 'justificativa'],
+    ],
   },
 ];
 
 const idDe = (n) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 
 async function main() {
+  for (const tipo of TIPOS_DO_SEED) {
+    // Não sobrescreve nome, cor nem ativo de um tipo que o comitê já tenha alterado.
+    await prisma.tipoIniciativa.upsert({ where: { code: tipo.code }, update: {}, create: tipo });
+  }
+
   const lookup = async (model) => new Map((await model.findMany()).map((l) => [l.code, l.id]));
   const [perfis, status, tipos, periodicidades] = await Promise.all([
     lookup(prisma.perfilUsuario),
@@ -278,7 +532,8 @@ async function main() {
       // Votantes fictícios (`seed-voter-N`), mais usuários reais que já curtiram.
       const votos = [];
       for (let i = 0; i < likes; i++) votos.push({ usuarioId: `seed-voter-${i}`, valor: 1 });
-      for (let i = 0; i < dislikes; i++) votos.push({ usuarioId: `seed-voter-${200 + i}`, valor: -1 });
+      for (let i = 0; i < dislikes; i++)
+        votos.push({ usuarioId: `seed-voter-${200 + i}`, valor: -1 });
       for (const quem of extras) votos.push({ usuarioId: USUARIOS[quem].id, valor: 1 });
       await prisma.voto.createMany({
         data: votos.map((v) => ({ iniciativaId: id, ciclo: 1, ...v })),
@@ -297,7 +552,9 @@ async function main() {
     }
   }
 
-  console.log(`Seed concluído: ${Object.keys(USUARIOS).length} usuários e ${INICIATIVAS.length} iniciativas de exemplo.`);
+  console.log(
+    `Seed concluído: ${Object.keys(USUARIOS).length} usuários e ${INICIATIVAS.length} iniciativas de exemplo.`,
+  );
 }
 
 main()

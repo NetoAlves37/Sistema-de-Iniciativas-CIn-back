@@ -1,4 +1,5 @@
-export type TipoIniciativa = 'EXTENSAO' | 'PESQUISA' | 'EVENTO';
+/** Código de um tipo do cadastro de `iniciativas` (por exemplo `PALESTRA`). */
+export type TipoIniciativa = string;
 export type StatusIniciativa =
   | 'EM_ANDAMENTO'
   | 'EM_VOTACAO'

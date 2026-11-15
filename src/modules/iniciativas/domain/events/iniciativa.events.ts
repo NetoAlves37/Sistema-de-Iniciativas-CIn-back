@@ -42,3 +42,15 @@ export class IniciativaDecidida extends EventoDeIniciativa {
 }
 
 export class IniciativaRessubmetida extends EventoDeIniciativa {}
+
+/** As datas ou horários de uma aprovada mudaram (a série inteira é recalculada). */
+export class DatasIniciativaAlteradas extends EventoDeIniciativa {
+  constructor(
+    iniciativaId: string,
+    ciclo: number,
+    ocorreuEm: Date,
+    readonly alteradaPor: string,
+  ) {
+    super(iniciativaId, ciclo, ocorreuEm);
+  }
+}

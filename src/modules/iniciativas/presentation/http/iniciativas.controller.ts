@@ -13,9 +13,19 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { AccessRole } from '@/common/auth/access-role.enum';
 import type { CurrentUser } from '@/common/auth/current-user.interface';
 import { GetCurrentUser } from '@/common/auth/decorators/current-user.decorator';
-import type { AtorDto, DadosIniciativaInput } from '../../application/dto/iniciativa.dto';
+import { Roles } from '@/common/auth/decorators/roles.decorator';
+import type {
+  AtorDto,
+  DadosIniciativaInput,
+  DatasIniciativaInput,
+} from '../../application/dto/iniciativa.dto';
 import { IniciativasFacade } from '../../application/iniciativas.facade';
-import { DadosIniciativaDto, ListagemQueryDto, MinhasQueryDto } from './iniciativas.dto';
+import {
+  DadosIniciativaDto,
+  DatasIniciativaDto,
+  ListagemQueryDto,
+  MinhasQueryDto,
+} from './iniciativas.dto';
 
 function atorDe(user: CurrentUser): AtorDto {
   return {
@@ -109,6 +119,28 @@ export class IniciativasController {
   ) {
     await this.iniciativas.editar(id, user.userId, corpo as DadosIniciativaInput);
     return this.iniciativas.detalhe(id, atorDe(user));
+  }
+
+  @Patch(':id/datas')
+  @Roles(AccessRole.COMITE, AccessRole.ADMIN)
+  @ApiOperation({
+    summary: 'Alterar datas e horários de uma aprovada (comitê ou ADMIN)',
+    description:
+      'Muda início, término e horários da iniciativa; todas as ocorrências do calendário são recalculadas. A periodicidade não muda.',
+  })
+  @ApiResponse({ status: 200, description: 'Detalhe atualizado' })
+  @ApiResponse({ status: 403, description: 'Só o comitê ou o ADMIN' })
+  @ApiResponse({ status: 404, description: 'Iniciativa não encontrada' })
+  @ApiResponse({ status: 409, description: 'Só iniciativas aprovadas' })
+  @ApiResponse({ status: 422, description: 'Datas ou horários inválidos, com `errors` por campo' })
+  async alterarDatas(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() corpo: DatasIniciativaDto,
+    @GetCurrentUser() user: CurrentUser,
+  ) {
+    const ator = atorDe(user);
+    await this.iniciativas.alterarDatas(id, ator, corpo as DatasIniciativaInput);
+    return this.iniciativas.detalhe(id, ator);
   }
 
   @Post(':id/ressubmissao')

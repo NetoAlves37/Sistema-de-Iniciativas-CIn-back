@@ -1,7 +1,9 @@
 import { createZodDto } from 'nestjs-zod';
 import { z } from 'zod';
 import { PaginationQuerySchema } from '@/common/pagination/pagination-query.dto';
-import { TIPOS_INICIATIVA } from '../../domain/periodicidade';
+import { FORMATO_CODIGO_TIPO } from '../../domain/periodicidade';
+
+const CODIGO_TIPO = z.string().regex(FORMATO_CODIGO_TIPO, 'Código de tipo inválido.');
 
 export const AprovadasQuerySchema = PaginationQuerySchema.extend({
   q: z
@@ -10,7 +12,7 @@ export const AprovadasQuerySchema = PaginationQuerySchema.extend({
     .optional()
     .transform((q) => (q ? q : undefined))
     .describe('Busca em título, resumo, organizadores e espaço (sem diferenciar maiúsculas)'),
-  tipo: z.enum(TIPOS_INICIATIVA).optional().describe('EXTENSAO, PESQUISA ou EVENTO'),
+  tipo: CODIGO_TIPO.optional().describe('Código do tipo (GET /tipos-iniciativa), ex.: PALESTRA'),
 });
 
 export class AprovadasQueryDto extends createZodDto(AprovadasQuerySchema) {}
@@ -34,8 +36,8 @@ export const OcorrenciasQuerySchema = z.object({
             .filter((tipo) => tipo !== '')
         : [],
     )
-    .pipe(z.array(z.enum(TIPOS_INICIATIVA)))
-    .describe('Lista separada por vírgulas de EXTENSAO, PESQUISA e EVENTO'),
+    .pipe(z.array(CODIGO_TIPO))
+    .describe('Códigos de tipo separados por vírgulas (GET /tipos-iniciativa)'),
   minhas: z
     .enum(['true', 'false'])
     .default('false')

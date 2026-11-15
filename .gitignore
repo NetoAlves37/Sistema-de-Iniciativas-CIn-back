@@ -2,6 +2,13 @@ node_modules
 dist
 coverage
 .env
+.env.*
+!.env.example
+
+# Backups do banco (pg_dump): têm dados reais e nunca vão para o repositório
+*.dump
+*.backup
+backup-*.sql
 *.log
 .vscode
 tsconfig.tsbuildinfo
