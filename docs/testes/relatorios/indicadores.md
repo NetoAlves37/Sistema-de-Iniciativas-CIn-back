@@ -9,7 +9,7 @@ Medição de 15/11/2026, tag `sprint3-parte1-medicao`, mesmo escopo e mesma ferr
 | Cobertura de linhas | coverage-v8 | 39,35% | 66,76% |
 | Cobertura de branches | coverage-v8 | 34,72% | 65,27% |
 | Cobertura de requisitos | Linhas da matriz com teste ÷ 54 | 72,2% (39) | 100% (54) |
-| Partições cobertas | Matriz | pendente (P04) | pendente (P04) |
+| Partições cobertas | Linhas de partição da matriz com teste ÷ 39 | 71,8% (28); 69,2% (27) sem o CT-21 | 100% (39) |
 | Valores-limite cobertos | Limites da Etapa 1 exercitados ÷ 30 | 80% (24) | 100% (30) |
 | Testes sem asserção ou com asserção trivial | Inspeção | 0 sem asserção; 16 só com `not.toThrow()` | 0 / 0 |
 | Defeitos reais encontrados | Falhas investigadas | 0 | 0 |

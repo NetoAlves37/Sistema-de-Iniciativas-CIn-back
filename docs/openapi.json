@@ -199,6 +199,9 @@
           "201": {
             "description": "Iniciativa criada em Em andamento (detalhe)"
           },
+          "409": {
+            "description": "O autor já tem uma iniciativa ativa com o mesmo título, data e horário de início (INICIATIVA_DUPLICADA)"
+          },
           "422": {
             "description": "Campos inválidos (RN-01 e RN-02), com `errors` por campo"
           }
@@ -253,10 +256,10 @@
             "name": "tipo",
             "required": false,
             "in": "query",
-            "description": "Filtro por tipo",
+            "description": "Filtro por código do tipo",
             "schema": {
-              "type": "string",
-              "enum": ["EXTENSAO", "PESQUISA", "EVENTO"]
+              "pattern": "^[A-Z0-9_]{1,40}$",
+              "type": "string"
             }
           },
           {
@@ -564,6 +567,148 @@
         "tags": ["Iniciativas"]
       }
     },
+    "/sistema-de-iniciativas-cin/api/v1/tipos-iniciativa": {
+      "get": {
+        "operationId": "TiposIniciativaController_listar_v1",
+        "parameters": [
+          {
+            "name": "ativos",
+            "required": true,
+            "in": "query",
+            "description": "true: só os tipos ativos (os que podem ser escolhidos)",
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tipos em ordem alfabética, com a contagem de iniciativas"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar os tipos (ativos e inativos, ou só os ativos)",
+        "tags": ["Tipos de iniciativa"]
+      },
+      "post": {
+        "operationId": "TiposIniciativaController_cadastrar_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CadastrarTipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tipo criado (ativo)"
+          },
+          "403": {
+            "description": "Só o comitê ou o ADMIN"
+          },
+          "422": {
+            "description": "Nome ou cor inválidos, ou nome repetido"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cadastrar um tipo (comitê ou ADMIN)",
+        "tags": ["Tipos de iniciativa"]
+      }
+    },
+    "/sistema-de-iniciativas-cin/api/v1/tipos-iniciativa/{id}": {
+      "patch": {
+        "description": "Vale mesmo com iniciativas associadas. O código do tipo não muda.",
+        "operationId": "TiposIniciativaController_alterar_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlterarTipoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tipo atualizado"
+          },
+          "403": {
+            "description": "Só o comitê ou o ADMIN"
+          },
+          "404": {
+            "description": "Tipo não encontrado"
+          },
+          "422": {
+            "description": "Nome ou cor inválidos, ou nome repetido"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Renomear, trocar a cor e/ou ativar e desativar um tipo (comitê ou ADMIN)",
+        "tags": ["Tipos de iniciativa"]
+      },
+      "delete": {
+        "operationId": "TiposIniciativaController_excluir_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Excluído"
+          },
+          "403": {
+            "description": "Só o comitê ou o ADMIN"
+          },
+          "404": {
+            "description": "Tipo não encontrado"
+          },
+          "409": {
+            "description": "Há iniciativas associadas ao tipo"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Excluir um tipo sem iniciativas associadas (comitê ou ADMIN)",
+        "tags": ["Tipos de iniciativa"]
+      }
+    },
     "/sistema-de-iniciativas-cin/api/v1/iniciativas/{id}/comentarios": {
       "get": {
         "description": "Ciclo mais recente primeiro e, dentro do ciclo, do mais antigo para o mais novo. Limite padrão: 50.",
@@ -786,10 +931,10 @@
             "name": "tipo",
             "required": false,
             "in": "query",
-            "description": "EXTENSAO, PESQUISA ou EVENTO",
+            "description": "Código do tipo (GET /tipos-iniciativa), ex.: PALESTRA",
             "schema": {
-              "type": "string",
-              "enum": ["EXTENSAO", "PESQUISA", "EVENTO"]
+              "pattern": "^[A-Z0-9_]{1,40}$",
+              "type": "string"
             }
           }
         ],
@@ -845,7 +990,7 @@
             "name": "tipos",
             "required": true,
             "in": "query",
-            "description": "Lista separada por vírgulas de EXTENSAO, PESQUISA e EVENTO",
+            "description": "Códigos de tipo separados por vírgulas (GET /tipos-iniciativa)",
             "schema": {}
           },
           {
@@ -1059,7 +1204,7 @@
         "type": "object",
         "properties": {
           "tipo": {
-            "description": "Tipo: EXTENSAO, PESQUISA, EVENTO",
+            "description": "Código de um tipo ativo do cadastro (GET /tipos-iniciativa), por exemplo PALESTRA",
             "type": "string"
           },
           "titulo": {
@@ -1139,6 +1284,36 @@
             "description": "Hora de término (HH:mm), posterior ao início; null para dia inteiro",
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "CadastrarTipoDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "description": "Nome do tipo (até 60 caracteres), por exemplo \"Palestra\"",
+            "type": "string"
+          },
+          "cor": {
+            "description": "Cor no formato #RRGGBB",
+            "type": "string"
+          }
+        }
+      },
+      "AlterarTipoDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "description": "Novo nome (o código do tipo não muda)",
+            "type": "string"
+          },
+          "cor": {
+            "description": "Nova cor, #RRGGBB",
+            "type": "string"
+          },
+          "ativo": {
+            "description": "false desativa: some da seleção de novas iniciativas",
+            "type": "boolean"
           }
         }
       },
