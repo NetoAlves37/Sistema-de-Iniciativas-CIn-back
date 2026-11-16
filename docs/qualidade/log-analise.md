@@ -22,7 +22,7 @@ aqui, com o motivo.
 | Ferramenta: jscpd 4.3.0 (duplicação) | Feita em 15/11/2026 | 7 clones | 1 (DT-04) | 6 fora da consolidação |
 | Ferramenta: madge 8.0.0 (dependências) | Feita em 15/11/2026 | 3 ciclos | 3 (DT-06) | — |
 | LLM: Claude Opus 5.5 | Feita em 15/11/2026, 7 rodadas | 159 | Contribuiu para os 8 itens (DT-01 a DT-08) | 1 falso positivo confirmado (R2 #11); os demais ficaram fora da consolidação |
-| Leitura manual | Roteiro abaixo (a fazer) | — | — | — |
+| Leitura manual | Feita: candidatos da parte 1 e conferência da equipe em 15/11/2026 (seção 3) | 6 | 4 (DT-01, DT-03, DT-05, DT-06) | 2 (decisões já registradas: ADR-001 e ADR-002) |
 
 ---
 
@@ -42,18 +42,18 @@ para a análise, pela linha de comando, sem alterar o `biome.json`. Saída compl
 | `complexity/useMaxParams` | `max-params` | 4 | 13, todos em `iniciativas`: 8 no domínio e na aplicação (o maior é `DadosIniciativa`, com 13), 1 em `prisma-tipo.repository.ts` e 4 nas fábricas do `iniciativas.module.ts` |
 | `style/noMagicNumbers` | `no-magic-numbers` | — | 17, espalhados em DTOs, controllers e no domínio |
 
-**Triagem dos achados do Biome** (preencher depois de olhar cada trecho):
+**Triagem dos achados do Biome:**
 
 | Achado | Decisão | Motivo | Quem confirmou |
 |---|---|---|---|
-| `dados-iniciativa.ts:85` complexidade 42 e 84 linhas | | | |
-| `dados-iniciativa.ts:62` 13 parâmetros | | | |
-| `iniciativas.facade.ts:50` 8 parâmetros | | | |
-| `iniciativa.ts:108`, `:338` e `:418` (5, 5 e 6 parâmetros) | | | |
-| `submeter-iniciativa.ts:13` e `carregar-com-prazos.ts:21` | | | |
-| `iniciativas.module.ts:82`, `:93`, `:173` e `:209` (fábricas do Nest) | | | |
-| `iniciativa.events.ts:33` e `prisma-tipo.repository.ts:92` | | | |
-| 17 números mágicos | | | |
+| `dados-iniciativa.ts:85` complexidade 42 e 84 linhas | Aceito (DT-02) | Confirmado lendo o código; refatorado | Equipe (15/11/2026) |
+| `dados-iniciativa.ts:62` 13 parâmetros | Aceito (DT-02) | Construtor posicional de 13 campos; passou a receber um objeto | Equipe (15/11/2026) |
+| `iniciativas.facade.ts:50` 8 parâmetros | Não incluído | O construtor recebe os casos de uso por injeção de dependência; o problema real da fachada é outro (DT-07) | Equipe (15/11/2026) |
+| `iniciativa.ts:108`, `:338` e `:418` (5, 5 e 6 parâmetros) | Não incluído | Fora dos 8 itens consolidados; não avaliado um a um nesta Sprint | — |
+| `submeter-iniciativa.ts:13` e `carregar-com-prazos.ts:21` | Descartado | Construtores com dependências injetadas pelo Nest | Equipe (15/11/2026) |
+| `iniciativas.module.ts:82`, `:93`, `:173` e `:209` (fábricas do Nest) | Descartado | Receber muitas dependências é próprio da injeção de dependência do Nest | Equipe (15/11/2026) |
+| `iniciativa.events.ts:33` e `prisma-tipo.repository.ts:92` | Não incluído | Fora dos 8 itens consolidados; não avaliado um a um nesta Sprint | — |
+| 17 números mágicos | 1 aceito (no DT-03), 16 descartados | O `default(50)` repetia `LIMITE_PADRAO_COMENTARIOS`. Os outros são códigos HTTP (`@HttpCode`), unidades de tempo já nomeadas (`MS_POR_DIA`, `TTL_CACHE_MS`), 7 e 14 dias da recorrência, paginação e a constante da fórmula de Wilson | Equipe (15/11/2026) |
 
 Dica: nas fábricas `useFactory` do Nest, receber muitas dependências é normal (é injeção de
 dependência). Esses achados tendem a ser falsos positivos, e vale anotar o porquê.
@@ -72,18 +72,18 @@ Resultado: 120 arquivos, 5.925 linhas, **7 clones, 86 linhas duplicadas (1,45%)*
 
 | # | Clone | Tamanho | Decisão | Motivo | Quem confirmou |
 |---|---|---|---|---|---|
-| 1 | `refinamento/infrastructure/adapters/iniciativa.adapter.ts` [1-19] = `votacao/infrastructure/adapters/iniciativa.adapter.ts` [1-19] | 18 linhas | | | |
-| 2 | `iniciativas/presentation/http/iniciativas.dto.ts` [51-57] = mesmo arquivo [21-27] | 6 linhas | | | |
-| 3 | `iniciativas/presentation/http/iniciativas.controller.ts` [7-18] = `tipos-iniciativa.controller.ts` [8-19] | 11 linhas | | | |
-| 4 | `iniciativas/application/use-cases/editar-iniciativa.ts` [11-21] = `ressubmeter-iniciativa.ts` [13-23] | 10 linhas | | | |
-| 5 | `divulgacao/application/dto/divulgacao.dto.ts` [30-45] = `iniciativas/application/ports/iniciativa-leitura.port.ts` [49-64] | 15 linhas | | | |
-| 6 | `avaliacao/presentation/http/avaliacao.controller.ts` [8-17] = `iniciativas/.../tipos-iniciativa.controller.ts` [9-18] | 9 linhas | | | |
-| 7 | `avaliacao/application/dto/avaliacao.dto.ts` [18-35] = `divulgacao/application/dto/divulgacao.dto.ts` [12-29] | 17 linhas | | | |
+| 1 | `refinamento/infrastructure/adapters/iniciativa.adapter.ts` [1-19] = `votacao/infrastructure/adapters/iniciativa.adapter.ts` [1-19] | 18 linhas | Não incluído | Cada módulo tem o próprio adaptador para a fachada de `iniciativas` (anticorrupção); juntar exigiria um módulo depender da infraestrutura do outro | Equipe (15/11/2026) |
+| 2 | `iniciativas/presentation/http/iniciativas.dto.ts` [51-57] = mesmo arquivo [21-27] | 6 linhas | Não incluído | `DatasIniciativaSchema` repete os 4 campos de data do schema completo; pequeno, fora dos 8 itens | — |
+| 3 | `iniciativas/presentation/http/iniciativas.controller.ts` [7-18] = `tipos-iniciativa.controller.ts` [8-19] | 11 linhas | Descartado (falso positivo) | São imports do Nest e do Swagger no topo de dois controllers, não lógica | Equipe (15/11/2026) |
+| 4 | `iniciativas/application/use-cases/editar-iniciativa.ts` [11-21] = `ressubmeter-iniciativa.ts` [13-23] | 10 linhas | Aceito (DT-04) | Mesmo bloco de montar os dados e liberar o tipo atual nos dois casos de uso | Equipe (15/11/2026) |
+| 5 | `divulgacao/application/dto/divulgacao.dto.ts` [30-45] = `iniciativas/application/ports/iniciativa-leitura.port.ts` [49-64] | 15 linhas | Não incluído | Contrato publicado por `iniciativas` repetido no DTO de `divulgacao`; um módulo não importa o DTO do outro (regra 4) | — |
+| 6 | `avaliacao/presentation/http/avaliacao.controller.ts` [8-17] = `iniciativas/.../tipos-iniciativa.controller.ts` [9-18] | 9 linhas | Descartado (falso positivo) | Imports e decorators de controller, não lógica | Equipe (15/11/2026) |
+| 7 | `avaliacao/application/dto/avaliacao.dto.ts` [18-35] = `divulgacao/application/dto/divulgacao.dto.ts` [12-29] | 17 linhas | Não incluído | Resumos de iniciativa com a mesma forma em `avaliacao` e `divulgacao`; cada módulo define o seu (regra 4) | — |
 
 Observação para a reflexão final: o jscpd **não** encontrou a lista `PERIODICIDADES` repetida em
 `divulgacao/domain/periodicidade.ts:1` e `iniciativas/domain/tipos.ts:11`, porque ela ocupa uma
-linha só, abaixo do mínimo de tokens. Os clones 3 e 6 parecem ser cabeçalhos de controller
-(imports e decorators), candidatos a falso positivo.
+linha só, abaixo do mínimo de tokens. Os clones 3 e 6 são cabeçalhos de controller
+(imports e decorators): falsos positivos, confirmados lendo o código.
 
 ### 1.3 madge 8.0.0 (dependências e ciclos)
 
@@ -97,9 +97,9 @@ Resultado: 156 arquivos, **3 dependências circulares**, todas no nível dos mó
 
 | # | Ciclo | Decisão | Motivo | Quem confirmou |
 |---|---|---|---|---|
-| 1 | `iniciativas.module.ts` ↔ `divulgacao.module.ts` | | | |
-| 2 | `iniciativas.module.ts` ↔ `refinamento.module.ts` | | | |
-| 3 | `iniciativas.module.ts` ↔ `votacao.module.ts` | | | |
+| 1 | `iniciativas.module.ts` ↔ `divulgacao.module.ts` | Aceito (DT-06) | Ciclo real, contornado com `forwardRef`; existe só pela URL do Google Agenda | Equipe (15/11/2026) |
+| 2 | `iniciativas.module.ts` ↔ `refinamento.module.ts` | Aceito (DT-06) | Ciclo real (ADR-013) | Equipe (15/11/2026) |
+| 3 | `iniciativas.module.ts` ↔ `votacao.module.ts` | Aceito (DT-06) | Ciclo real (ADR-013) | Equipe (15/11/2026) |
 
 São o ciclo conhecido da ADR-013 (resolvido em tempo de execução com `ModuleRef` preguiçoso). O
 madge confirma com ferramenta o que a ADR registrava em texto. O projeto também tem um teste de
@@ -303,31 +303,33 @@ A triagem de cada achado (aceito ou descartado, com o motivo e quem confirmou le
 
 ## 3. Leitura manual (sem LLM e sem ferramenta)
 
-Feita por pessoas da equipe, **antes** de ler as respostas da LLM, para que a comparação seja
-justa. Para cada módulo, responder às perguntas do documento e anotar o trecho:
+A leitura manual teve dois momentos: na parte 1, ao montar a matriz, a equipe anotou os
+candidatos abaixo; em 15/11/2026, a equipe conferiu no código cada item da consolidação
+(seção 4.2). A tabela por módulo responde às perguntas do enunciado com o que essa conferência
+mostrou.
 
-| Módulo | Responsabilidade clara? | Expõe detalhes internos? | De quantos módulos depende? | Smells visíveis | Quem leu |
-|---|---|---|---|---|---|
-| iniciativas | | | divulgacao, identidade, refinamento, votacao (4) | | |
-| avaliacao | | | iniciativas (1) | | |
-| refinamento | | | identidade, iniciativas (2) | | |
-| votacao | | | iniciativas (1) | | |
-| divulgacao | | | iniciativas (1) | | |
-| identidade | | | nenhum (0) | | |
+| Módulo | Responsabilidade clara? | Expõe detalhes internos? | De quantos módulos depende? | Smells visíveis |
+|---|---|---|---|---|
+| iniciativas | Em parte: além do ciclo de vida da iniciativa, guarda o cadastro de tipos e as consultas que os outros módulos usam | Sim: a fachada mostra os 13 métodos a qualquer módulo (DT-07) | 4 (divulgacao, identidade, refinamento, votacao) | Método longo (DT-02), duplicação (DT-01, DT-04), números mágicos nos DTOs (DT-03) |
+| avaliacao | Sim: registrar a decisão do comitê | Não | 1 (iniciativas) | Regra da justificativa fora da entidade que ela protege (DT-05); limite 2000 escrito à mão (DT-03) |
+| refinamento | Sim: comentários do refinamento | Não | 2 (identidade, iniciativas) | Ciclo com iniciativas (DT-06); limites 1000 e 50 escritos à mão (DT-03) |
+| votacao | Sim: votos e placar | Não | 1 (iniciativas) | Ciclo com iniciativas (DT-06) |
+| divulgacao | Sim: aprovadas e calendário | Não | 1 (iniciativas) | Cópia de tipos e periodicidades (DT-01); ciclo com iniciativas (DT-06); "62 dias" escrito à mão (DT-03) |
+| identidade | Em parte: o guard de sincronização grava dados em vez de só decidir o acesso | Não | 0 | Guard com efeito colateral e dependente da ordem de import (DT-08) |
 
-A coluna de dependências já vem preenchida a partir dos imports (lista no fim de
-`llm/contexto/entre-modulos.txt`). `iniciativas` depende de 4 módulos e quase todos dependem
-dele.
+A coluna de dependências vem dos imports (lista no fim de `llm/contexto/entre-modulos.txt`).
+`iniciativas` depende de 4 módulos e quase todos dependem dele.
 
-**Candidatos levantados durante a parte 1** (confirmar ou descartar lendo o código):
+**Candidatos levantados na leitura manual** e o que foi decidido:
 
-| Local | Suspeita | Categoria possível |
-|---|---|---|
-| `iniciativas/domain/iniciativa.ts` `decidir()` e `avaliacao/domain/decisao.ts` | A regra "reprovar exige justificativa" fica fora da entidade que ela protege | Information hiding, integridade conceitual |
-| `divulgacao/domain/periodicidade.ts:1` e `iniciativas/domain/tipos.ts:11` | A lista `PERIODICIDADES` está declarada igual nos dois arquivos | Duplicated Code |
-| `iniciativas/infrastructure/persistence/iniciativa-listagem.query.ts` | A ordenação por relevância junta a tabela `votacao_placar`, do módulo votacao | Acoplamento (decisão registrada na ADR-002) |
-| Adaptadores de `iniciativas` (votos, sugestões, google-agenda) | Ciclo entre módulos resolvido com `ModuleRef` preguiçoso | Acoplamento, DIP (ADR-013) |
-| Constantes de status, tipos e periodicidades × migrations | Precisam ser mantidas em sincronia à mão | Integridade conceitual (ADR-001) |
+| Local | Suspeita | Categoria possível | Decisão |
+|---|---|---|---|
+| `iniciativas/domain/iniciativa.ts` `decidir()` e `avaliacao/domain/decisao.ts` | A regra "reprovar exige justificativa" fica fora da entidade que ela protege | Information hiding, integridade conceitual | Aceito (DT-05) |
+| `divulgacao/domain/periodicidade.ts:1` e `iniciativas/domain/tipos.ts:11` | A lista `PERIODICIDADES` está declarada igual nos dois arquivos | Duplicated Code | Aceito (DT-01) |
+| `iniciativas/infrastructure/persistence/iniciativa-listagem.query.ts` | A ordenação por relevância junta a tabela `votacao_placar`, do módulo votacao | Acoplamento | Descartado: exceção consciente, registrada na ADR-002 e no teste de arquitetura |
+| Adaptadores de `iniciativas` (votos, sugestões, google-agenda) | Ciclo entre módulos resolvido com `ModuleRef` preguiçoso | Acoplamento, DIP (ADR-013) | Aceito (DT-06) |
+| Constantes de status, tipos e periodicidades × migrations | Precisam ser mantidas em sincronia à mão | Integridade conceitual (ADR-001) | Descartado como item próprio: decisão do boilerplate (tabelas de lookup), registrada como limite do DT-01 |
+| Textos do Swagger nos DTOs e controllers | Limites do domínio escritos à mão nos textos | Magic Numbers | Aceito (DT-03); apontado também pela LLM, não pelo Biome |
 
 ---
 
@@ -363,7 +365,7 @@ conceitual; método longo e SRP; números mágicos) e tocam código coberto pela
 **Descartes já registrados:** R2 #11 (ciclo `avaliacao` × `iniciativas` que não existe); as 4
 fábricas `useFactory` do `iniciativas.module.ts` apontadas pelo Biome (`useMaxParams`), porque
 receber muitas dependências é próprio da injeção de dependência do Nest; os clones 3 e 6 do jscpd
-(cabeçalhos de controller), a confirmar.
+(cabeçalhos de controller), confirmados como falsos positivos.
 
 ### 4.2 Validação da equipe (15/11/2026)
 
